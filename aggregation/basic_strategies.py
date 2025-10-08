@@ -5,7 +5,7 @@ import networkx as nx
 
 from ..exceptions import AggregationError
 from ..interfaces import (
-    TopologyStrategy
+    TopologyStrategy, NodePropertyStrategy
 )
 
 
@@ -139,3 +139,66 @@ class ElectricalTopologyStrategy(TopologyStrategy):
     def can_create_new_edges(self) -> bool:
         """Electrical topology may create new edges depending on connectivity mode"""
         return self.initial_connectivity == "full"
+
+
+# ============================================================================
+# NODE PROPERTY STRATEGIES - Statistical aggregation for node properties
+# ============================================================================
+
+class SumNodeStrategy(NodePropertyStrategy):
+    """Sum numerical properties across nodes in a cluster"""
+
+    def aggregate_property(self, graph: nx.Graph, nodes: List[Any], property_name: str) -> Any:
+        """Sum property values across nodes"""
+        try:
+            values = []
+            for node in nodes:
+                if property_name in graph.nodes[node]:
+                    value = graph.nodes[node][property_name]
+                    if isinstance(value, (int, float)):
+                        values.append(value)
+
+            return sum(values) if values else 0
+        except Exception as e:
+            raise AggregationError(
+                f"Failed to sum node property '{property_name}': {e}",
+                strategy="sum"
+            ) from e
+
+
+class AverageNodeStrategy(NodePropertyStrategy):
+    """Average numerical properties across nodes in a cluster"""
+
+    def aggregate_property(self, graph: nx.Graph, nodes: List[Any], property_name: str) -> Any:
+        """Average property values across nodes"""
+        try:
+            values = []
+            for node in nodes:
+                if property_name in graph.nodes[node]:
+                    value = graph.nodes[node][property_name]
+                    if isinstance(value, (int, float)):
+                        values.append(value)
+
+            return sum(values) / len(values) if values else 0
+        except Exception as e:
+            raise AggregationError(
+                f"Failed to average node property '{property_name}': {e}",
+                strategy="average"
+            ) from e
+
+
+class FirstNodeStrategy(NodePropertyStrategy):
+    """Take the first available value for non-numerical properties"""
+
+    def aggregate_property(self, graph: nx.Graph, nodes: List[Any], property_name: str) -> Any:
+        """Take first available property value"""
+        try:
+            for node in nodes:
+                if property_name in graph.nodes[node]:
+                    return graph.nodes[node][property_name]
+            return None
+        except Exception as e:
+            raise AggregationError(
+                f"Failed to get first node property '{property_name}': {e}",
+                strategy="first"
+            ) from e
