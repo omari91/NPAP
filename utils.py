@@ -79,3 +79,23 @@ def compute_graph_hash(graph: nx.Graph) -> str:
     # Convert to JSON and hash
     json_str = json.dumps(graph_data, sort_keys=True)
     return hashlib.sha256(json_str.encode()).hexdigest()[:16]
+
+
+def validate_graph_compatibility(partition_result, current_graph_hash: str):
+    """
+    Validate that a partition result is compatible with the current graph
+
+    Raises GraphCompatibilityError if hashes don't match
+
+    Args:
+        partition_result: PartitionResult object
+        current_graph_hash: Hash of the current graph
+    """
+    if partition_result.original_graph_hash != current_graph_hash:
+        from .exceptions import GraphCompatibilityError
+        raise GraphCompatibilityError(
+            "Partition was created from a different graph. "
+            "Graph structure has changed since partition was created.",
+            expected_hash=partition_result.original_graph_hash,
+            actual_hash=current_graph_hash
+        )
