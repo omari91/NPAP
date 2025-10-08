@@ -1,0 +1,9 @@
+name: npap_env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - networkx
+  - numpy
+  - pandas
+  - scikit-learn
