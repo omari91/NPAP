@@ -1,12 +1,12 @@
 import warnings
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import networkx as nx
 
 from .interfaces import (
     DataLoadingStrategy, PartitioningStrategy, AggregationProfile, AggregationMode,
     TopologyStrategy, PhysicalAggregationStrategy,
-    NodePropertyStrategy, EdgePropertyStrategy
+    NodePropertyStrategy, EdgePropertyStrategy, PartitionResult
 )
 
 
@@ -379,3 +379,115 @@ class AggregationManager:
         self._edge_strategies['sum'] = SumEdgeStrategy()
         self._edge_strategies['average'] = AverageEdgeStrategy()
         self._edge_strategies['first'] = FirstEdgeStrategy()
+
+
+class PartitionAggregatorManager:
+    """Main orchestrator - the primary class users interact with"""
+
+    def __init__(self):
+        self._current_graph: Optional[nx.Graph] = None
+        self._current_graph_hash: Optional[str] = None
+        self._current_partition: Optional[PartitionResult] = None
+
+        # Managers for strategies
+        self.input_manager = InputDataManager()
+        self.partitioning_manager = PartitioningManager()
+        self.aggregation_manager = AggregationManager()
+
+    def load_data(self, strategy: str, **kwargs) -> nx.Graph:
+        """Load data using specified strategy"""
+        self._current_graph = self.input_manager.load(strategy, **kwargs)
+        self._current_graph_hash = self._compute_graph_hash(self._current_graph)
+        self._current_partition = None  # Clear any existing partition
+        return self._current_graph
+
+    def partition(self, strategy: str, n_clusters: int, **kwargs) -> PartitionResult:
+        """Partition current graph and store result"""
+        if not self._current_graph:
+            raise ValueError("No graph loaded. Call load_data() first.")
+
+        mapping = self.partitioning_manager.partition(
+            self._current_graph, strategy, n_clusters, **kwargs
+        )
+
+        self._current_partition = PartitionResult(
+            mapping=mapping,
+            original_graph_hash=self._current_graph_hash,
+            strategy_name=strategy,
+            strategy_metadata={},
+            n_clusters=n_clusters
+        )
+        return self._current_partition
+
+    def aggregate(self, partition_result: PartitionResult = None,
+                  profile: AggregationProfile = None,
+                  mode: AggregationMode = None) -> nx.Graph:
+        """
+        Aggregate using partition result and profile
+
+        Args:
+            partition_result: Partition to use (or use stored partition)
+            profile: Aggregation profile (custom configuration)
+            mode: Aggregation mode (pre-defined configuration)
+
+        Note: If both profile and mode are provided, profile takes precedence
+        """
+        if not self._current_graph:
+            raise ValueError("No graph loaded.")
+
+        # Use provided partition or stored partition
+        partition_to_use = partition_result or self._current_partition
+        if not partition_to_use:
+            raise ValueError(
+                "No partition available. Call partition() first or provide partition_result."
+            )
+
+        # Validate partition compatibility
+        from .utils import validate_graph_compatibility
+        validate_graph_compatibility(partition_to_use, self._current_graph_hash)
+
+        # Determine profile to use
+        if profile is None and mode is not None:
+            profile = self.aggregation_manager.get_mode_profile(mode)
+        elif profile is None:
+            profile = AggregationProfile()  # Default
+
+        # Aggregate and update current graph
+        self._current_graph = self.aggregation_manager.aggregate(
+            self._current_graph, partition_to_use.mapping, profile
+        )
+
+        # Update hash and clear partition since graph has changed
+        self._current_graph_hash = self._compute_graph_hash(self._current_graph)
+        self._current_partition = None
+
+        return self._current_graph
+
+    def full_workflow(self, data_strategy: str, partition_strategy: str,
+                      n_clusters: int, aggregation_profile: AggregationProfile = None,
+                      aggregation_mode: AggregationMode = None,
+                      **kwargs) -> nx.Graph:
+        """Execute complete workflow without storing intermediates"""
+        # Extract data loading params vs partition params
+        data_params = {k: v for k, v in kwargs.items()
+                       if k in ['node_file', 'edge_file', 'graph', 'connection_string', 'table_prefix']}
+        partition_params = {k: v for k, v in kwargs.items() if k not in data_params}
+
+        # Execute pipeline
+        self.load_data(data_strategy, **data_params)
+        partition_result = self.partition(partition_strategy, n_clusters, **partition_params)
+        return self.aggregate(partition_result, aggregation_profile, aggregation_mode)
+
+    def get_current_graph(self) -> Optional[nx.Graph]:
+        """Get the current graph"""
+        return self._current_graph
+
+    def get_current_partition(self) -> Optional[PartitionResult]:
+        """Get the current partition result"""
+        return self._current_partition
+
+    @staticmethod
+    def _compute_graph_hash(graph: nx.Graph) -> str:
+        """Compute hash for graph validation"""
+        from .utils import compute_graph_hash
+        return compute_graph_hash(graph)
