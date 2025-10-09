@@ -1,9 +1,12 @@
+import warnings
 from typing import Any, Dict, List
 
 import networkx as nx
 
 from .interfaces import (
-    DataLoadingStrategy, PartitioningStrategy
+    DataLoadingStrategy, PartitioningStrategy, AggregationProfile, AggregationMode,
+    TopologyStrategy, PhysicalAggregationStrategy,
+    NodePropertyStrategy, EdgePropertyStrategy
 )
 
 
@@ -72,3 +75,307 @@ class PartitioningManager:
             algorithm='kmedoids',
             distance_metric='haversine'
         )
+
+
+class AggregationManager:
+    """
+    Manages aggregation strategies and orchestrates the aggregation process
+
+    Aggregation is a 3-step process:
+    1. Topology creation (graph structure)
+    2. Physical aggregation (electrical laws)
+    3. Statistical property aggregation (independent properties)
+    """
+
+    def __init__(self):
+        # Topology strategies (how graph structure is reduced)
+        self._topology_strategies: Dict[str, TopologyStrategy] = {}
+
+        # Physical aggregation strategies (electrical laws)
+        self._physical_strategies: Dict[str, PhysicalAggregationStrategy] = {}
+
+        # Statistical property aggregation strategies
+        self._node_strategies: Dict[str, NodePropertyStrategy] = {}
+        self._edge_strategies: Dict[str, EdgePropertyStrategy] = {}
+
+        self._register_default_strategies()
+
+    def register_topology_strategy(self, name: str, strategy: TopologyStrategy):
+        """Register a topology strategy"""
+        self._topology_strategies[name] = strategy
+
+    def register_physical_strategy(self, name: str, strategy: PhysicalAggregationStrategy):
+        """Register a physical aggregation strategy"""
+        self._physical_strategies[name] = strategy
+
+    def register_node_strategy(self, name: str, strategy: NodePropertyStrategy):
+        """Register a node property aggregation strategy"""
+        self._node_strategies[name] = strategy
+
+    def register_edge_strategy(self, name: str, strategy: EdgePropertyStrategy):
+        """Register an edge property aggregation strategy"""
+        self._edge_strategies[name] = strategy
+
+    @staticmethod
+    def get_mode_profile(mode: AggregationMode, **overrides) -> AggregationProfile:
+        """
+        Get pre-defined aggregation profile for a given mode
+
+        Args:
+            mode: Aggregation mode
+            **overrides: Override specific profile parameters
+
+        Returns:
+            AggregationProfile configured for the mode
+        """
+        from .aggregation.modes import get_mode_profile
+        return get_mode_profile(mode, **overrides)
+
+    def aggregate(self, graph: nx.Graph, partition_map: Dict[int, List[Any]],
+                  profile: AggregationProfile = None) -> nx.Graph:
+        """
+        Execute aggregation using the specified profile
+
+        Aggregation is a 3-step process:
+        1. Create topology (nodes + edge structure)
+        2. Apply physical aggregation (if specified)
+        3. Aggregate remaining properties statistically
+        """
+        if profile is None:
+            profile = AggregationProfile()  # Use defaults
+
+        # Validate strategies exist
+        self._validate_profile(profile)
+
+        # Step 1: Create topology
+        topology_strategy = self._topology_strategies[profile.topology_strategy]
+        aggregated = topology_strategy.create_topology(graph, partition_map)
+
+        # Track which properties are handled by physical aggregation
+        physical_modified_properties = set()
+
+        # Step 2: Apply physical aggregation (if specified)
+        if profile.physical_strategy:
+            physical_strategy = self._physical_strategies[profile.physical_strategy]
+
+            # Validate topology compatibility
+            if topology_strategy.__class__.__name__ != physical_strategy.required_topology:
+                warnings.warn(
+                    f"Physical strategy '{profile.physical_strategy}' recommends "
+                    f"'{physical_strategy.required_topology}' topology, "
+                    f"but '{profile.topology_strategy}' is being used. "
+                    f"Results may be incorrect."
+                )
+
+            # Apply physical aggregation
+            aggregated = physical_strategy.aggregate(
+                graph, partition_map, aggregated,
+                profile.physical_properties,
+                profile.physical_parameters
+            )
+
+            # Mark properties as modified by physical strategy
+            physical_modified_properties = set(physical_strategy.modifies_properties)
+
+            # Warn user if they tried to override physical properties
+            self._check_property_conflicts(profile, physical_modified_properties)
+
+        # Step 3: Aggregate node properties (skip properties aggregated in physical step)
+        self._aggregate_node_properties(
+            graph, partition_map, aggregated, profile, physical_modified_properties
+        )
+
+        # Step 4: Aggregate edge properties (skip properties aggregated in physical step)
+        self._aggregate_edge_properties(
+            graph, partition_map, aggregated, profile, physical_modified_properties
+        )
+
+        return aggregated
+
+    def _validate_profile(self, profile: AggregationProfile):
+        """Validate that all strategies in profile exist"""
+        if profile.topology_strategy not in self._topology_strategies:
+            available = ', '.join(self._topology_strategies.keys())
+            raise ValueError(
+                f"Unknown topology strategy: {profile.topology_strategy}. "
+                f"Available: {available}"
+            )
+
+        if profile.physical_strategy and profile.physical_strategy not in self._physical_strategies:
+            available = ', '.join(self._physical_strategies.keys())
+            raise ValueError(
+                f"Unknown physical strategy: {profile.physical_strategy}. "
+                f"Available: {available}"
+            )
+
+        # Validate node property strategies
+        for prop, strategy in profile.node_properties.items():
+            if strategy not in self._node_strategies:
+                available = ', '.join(self._node_strategies.keys())
+                raise ValueError(
+                    f"Unknown node strategy '{strategy}' for property '{prop}'. "
+                    f"Available: {available}"
+                )
+
+        # Validate edge property strategies
+        for prop, strategy in profile.edge_properties.items():
+            if strategy not in self._edge_strategies:
+                available = ', '.join(self._edge_strategies.keys())
+                raise ValueError(
+                    f"Unknown edge strategy '{strategy}' for property '{prop}'. "
+                    f"Available: {available}"
+                )
+
+    @staticmethod
+    def _check_property_conflicts(profile: AggregationProfile, physical_properties: set):
+        """
+        Check if user tried to override properties handled by physical strategy
+        Issue warnings for conflicts
+        """
+        # Check node properties
+        for prop in profile.node_properties:
+            if prop in physical_properties:
+                warnings.warn(
+                    f"Node property '{prop}' is modified by physical strategy "
+                    f"'{profile.physical_strategy}'. Your statistical aggregation "
+                    f"for this property will be IGNORED.",
+                    UserWarning
+                )
+
+        # Check edge properties
+        for prop in profile.edge_properties:
+            if prop in physical_properties:
+                warnings.warn(
+                    f"Edge property '{prop}' is modified by physical strategy "
+                    f"'{profile.physical_strategy}'. Your statistical aggregation "
+                    f"for this property will be IGNORED.",
+                    UserWarning
+                )
+
+    def _aggregate_node_properties(self, graph: nx.Graph, partition_map: Dict[int, List[Any]],
+                                   aggregated: nx.Graph, profile: AggregationProfile,
+                                   skip_properties: set = None):
+        """Aggregate node properties statistically, skipping properties aggregated in physical step"""
+        skip_properties = skip_properties or set()
+
+        # Collect all possible properties
+        all_properties = set()
+        for nodes in partition_map.values():
+            for node in nodes:
+                all_properties.update(graph.nodes[node].keys())
+
+        for cluster_id, nodes in partition_map.items():
+            node_attrs = {}
+
+            for prop in all_properties:
+                # Skip properties handled by physical aggregation
+                if prop in skip_properties:
+                    continue
+
+                if prop in profile.node_properties:
+                    # User specified strategy
+                    strategy_name = profile.node_properties[prop]
+                    strategy = self._node_strategies[strategy_name]
+                    node_attrs[prop] = strategy.aggregate_property(graph, nodes, prop)
+                else:
+                    # Use default strategy with optional warning
+                    if profile.warn_on_defaults:
+                        warnings.warn(
+                            f"Node property '{prop}' not specified in profile. "
+                            f"Using default strategy '{profile.default_node_strategy}'"
+                        )
+
+                    if profile.default_node_strategy in self._node_strategies:
+                        strategy = self._node_strategies[profile.default_node_strategy]
+                        node_attrs[prop] = strategy.aggregate_property(graph, nodes, prop)
+                    else:
+                        # Fallback to first value
+                        node_attrs[prop] = graph.nodes[nodes[0]].get(prop)
+
+            # Update node attributes
+            aggregated.nodes[cluster_id].update(node_attrs)
+
+    def _aggregate_edge_properties(self, graph: nx.Graph, partition_map: Dict[int, List[Any]],
+                                   aggregated: nx.Graph, profile: AggregationProfile,
+                                   skip_properties: set = None):
+        """Aggregate edge properties statistically, skipping properties aggregated in physical step"""
+        skip_properties = skip_properties or set()
+
+        # Collect all possible edge properties
+        all_properties = set()
+        for edge in graph.edges():
+            all_properties.update(graph.edges[edge].keys())
+
+        # For each edge in aggregated graph, find corresponding original edges
+        for edge in aggregated.edges():
+            cluster1, cluster2 = edge
+            nodes1 = partition_map[cluster1]
+            nodes2 = partition_map[cluster2]
+
+            # Find all original edges between these clusters
+            original_edges = []
+            for n1 in nodes1:
+                for n2 in nodes2:
+                    if graph.has_edge(n1, n2):
+                        original_edges.append(graph.edges[n1, n2])
+
+            if not original_edges:
+                continue
+
+            # Aggregate properties
+            edge_attrs = {}
+            for prop in all_properties:
+                # Skip properties handled by physical aggregation
+                if prop in skip_properties:
+                    continue
+
+                if prop in profile.edge_properties:
+                    # User specified strategy
+                    strategy_name = profile.edge_properties[prop]
+                    strategy = self._edge_strategies[strategy_name]
+                    edge_attrs[prop] = strategy.aggregate_property(original_edges, prop)
+                else:
+                    # Use default strategy
+                    if profile.warn_on_defaults:
+                        warnings.warn(
+                            f"Edge property '{prop}' not specified in profile. "
+                            f"Using default strategy '{profile.default_edge_strategy}'"
+                        )
+
+                    if profile.default_edge_strategy in self._edge_strategies:
+                        strategy = self._edge_strategies[profile.default_edge_strategy]
+                        edge_attrs[prop] = strategy.aggregate_property(original_edges, prop)
+                    else:
+                        # Fallback to first value
+                        edge_attrs[prop] = original_edges[0].get(prop) if original_edges else None
+
+            # Update edge attributes
+            aggregated.edges[edge].update(edge_attrs)
+
+    def _register_default_strategies(self):
+        """Register built-in aggregation strategies"""
+        from .aggregation.basic_strategies import (
+            SimpleTopologyStrategy, ElectricalTopologyStrategy,
+            SumNodeStrategy, AverageNodeStrategy, FirstNodeStrategy,
+            SumEdgeStrategy, AverageEdgeStrategy, FirstEdgeStrategy
+        )
+        from .aggregation.physical_strategies import (
+            KronReductionStrategy
+        )
+
+        # Topology strategies
+        self._topology_strategies['simple'] = SimpleTopologyStrategy()
+        self._topology_strategies['electrical'] = ElectricalTopologyStrategy()
+
+        # Physical strategies
+        self._physical_strategies['kron_reduction'] = KronReductionStrategy()
+
+        # Node property strategies
+        self._node_strategies['sum'] = SumNodeStrategy()
+        self._node_strategies['average'] = AverageNodeStrategy()
+        self._node_strategies['first'] = FirstNodeStrategy()
+
+        # Edge property strategies
+        self._edge_strategies['sum'] = SumEdgeStrategy()
+        self._edge_strategies['average'] = AverageEdgeStrategy()
+        self._edge_strategies['first'] = FirstEdgeStrategy()
