@@ -4,8 +4,8 @@ import networkx as nx
 import numpy as np
 from sklearn.cluster import KMeans
 
-from ..exceptions import PartitioningError
-from ..interfaces import PartitioningStrategy
+from exceptions import PartitioningError
+from interfaces import PartitioningStrategy
 
 
 class GeographicalPartitioning(PartitioningStrategy):

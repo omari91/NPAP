@@ -7,7 +7,7 @@ Each mode provides a validated combination of:
 - Statistical property aggregation defaults
 """
 
-from ..interfaces import AggregationProfile, AggregationMode
+from interfaces import AggregationProfile, AggregationMode
 
 
 def get_mode_profile(mode: AggregationMode, **overrides) -> AggregationProfile:

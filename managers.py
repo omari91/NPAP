@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import networkx as nx
 
-from .interfaces import (
+from interfaces import (
     DataLoadingStrategy, PartitioningStrategy, AggregationProfile, AggregationMode,
     TopologyStrategy, PhysicalAggregationStrategy,
     NodePropertyStrategy, EdgePropertyStrategy, PartitionResult
@@ -33,8 +33,8 @@ class InputDataManager:
 
     def _register_default_strategies(self):
         """Register built-in loading strategies"""
-        from .input.csv_loader import CSVFilesStrategy
-        from .input.networkx_loader import NetworkXDirectStrategy
+        from input.csv_loader import CSVFilesStrategy
+        from input.networkx_loader import NetworkXDirectStrategy
 
         self._strategies['csv_files'] = CSVFilesStrategy()
         self._strategies['networkx_direct'] = NetworkXDirectStrategy()
@@ -61,7 +61,7 @@ class PartitioningManager:
 
     def _register_default_strategies(self):
         """Register built-in partitioning strategies"""
-        from .partitioning.geographical import GeographicalPartitioning
+        from partitioning.geographical import GeographicalPartitioning
 
         self._strategies['geographical_kmeans'] = GeographicalPartitioning(
             algorithm='kmeans',
@@ -128,7 +128,7 @@ class AggregationManager:
         Returns:
             AggregationProfile configured for the mode
         """
-        from .aggregation.modes import get_mode_profile
+        from aggregation.modes import get_mode_profile
         return get_mode_profile(mode, **overrides)
 
     def aggregate(self, graph: nx.Graph, partition_map: Dict[int, List[Any]],
@@ -354,12 +354,12 @@ class AggregationManager:
 
     def _register_default_strategies(self):
         """Register built-in aggregation strategies"""
-        from .aggregation.basic_strategies import (
+        from aggregation.basic_strategies import (
             SimpleTopologyStrategy, ElectricalTopologyStrategy,
             SumNodeStrategy, AverageNodeStrategy, FirstNodeStrategy,
             SumEdgeStrategy, AverageEdgeStrategy, FirstEdgeStrategy
         )
-        from .aggregation.physical_strategies import (
+        from aggregation.physical_strategies import (
             KronReductionStrategy
         )
 
@@ -443,7 +443,7 @@ class PartitionAggregatorManager:
             )
 
         # Validate partition compatibility
-        from .utils import validate_graph_compatibility
+        from utils import validate_graph_compatibility
         validate_graph_compatibility(partition_to_use, self._current_graph_hash)
 
         # Determine profile to use
@@ -489,5 +489,5 @@ class PartitionAggregatorManager:
     @staticmethod
     def _compute_graph_hash(graph: nx.Graph) -> str:
         """Compute hash for graph validation"""
-        from .utils import compute_graph_hash
+        from utils import compute_graph_hash
         return compute_graph_hash(graph)

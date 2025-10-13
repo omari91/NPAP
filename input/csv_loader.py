@@ -3,8 +3,8 @@ from pathlib import Path
 import networkx as nx
 import pandas as pd
 
-from ..exceptions import DataLoadingError
-from ..interfaces import DataLoadingStrategy
+from exceptions import DataLoadingError
+from interfaces import DataLoadingStrategy
 
 
 class CSVFilesStrategy(DataLoadingStrategy):

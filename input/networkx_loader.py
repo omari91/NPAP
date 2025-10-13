@@ -1,7 +1,7 @@
 import networkx as nx
 
-from ..exceptions import DataLoadingError
-from ..interfaces import DataLoadingStrategy
+from exceptions import DataLoadingError
+from interfaces import DataLoadingStrategy
 
 
 class NetworkXDirectStrategy(DataLoadingStrategy):

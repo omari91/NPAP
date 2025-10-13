@@ -25,7 +25,7 @@ def validate_required_attributes(func):
                 # Use set operations - much faster than individual checks
                 missing_attrs = required_node_attrs - node_attrs.keys()
                 if missing_attrs:
-                    from .exceptions import ValidationError
+                    from exceptions import ValidationError
                     raise ValidationError(
                         f"Node {node_id} missing required attributes",
                         missing_attributes={'nodes': list(missing_attrs)},
@@ -39,7 +39,7 @@ def validate_required_attributes(func):
                 edge_attrs = graph.edges[edge]
                 missing_attrs = required_edge_attrs - edge_attrs.keys()
                 if missing_attrs:
-                    from .exceptions import ValidationError
+                    from exceptions import ValidationError
                     raise ValidationError(
                         f"Edge {edge} missing required attributes",
                         missing_attributes={'edges': list(missing_attrs)},
@@ -92,7 +92,7 @@ def validate_graph_compatibility(partition_result, current_graph_hash: str):
         current_graph_hash: Hash of the current graph
     """
     if partition_result.original_graph_hash != current_graph_hash:
-        from .exceptions import GraphCompatibilityError
+        from exceptions import GraphCompatibilityError
         raise GraphCompatibilityError(
             "Partition was created from a different graph. "
             "Graph structure has changed since partition was created.",
