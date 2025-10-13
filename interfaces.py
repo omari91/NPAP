@@ -117,6 +117,15 @@ class TopologyStrategy(ABC):
         """Whether this strategy can create edges that didn't exist in original graph"""
         return False
 
+    @staticmethod
+    def _clusters_connected(graph: nx.Graph, nodes1: List[Any], nodes2: List[Any]) -> bool:
+        """Return True if any edge exists between nodes in nodes1 and nodes2."""
+        for n1 in nodes1:
+            for n2 in nodes2:
+                if graph.has_edge(n1, n2):
+                    return True
+        return False
+
 
 class PhysicalAggregationStrategy(ABC):
     """

@@ -40,17 +40,7 @@ class SimpleTopologyStrategy(TopologyStrategy):
                 nodes2 = partition_map[cluster2]
 
                 # Check if there are any edges between these clusters
-                has_connection = False
-                for n1 in nodes1:
-                    for n2 in nodes2:
-                        if graph.has_edge(n1, n2):
-                            has_connection = True
-                            break
-                    if has_connection:
-                        break
-
-                # Add edge if connection exists
-                if has_connection:
+                if self._clusters_connected(graph, nodes1, nodes2):
                     aggregated.add_edge(cluster1, cluster2)
 
             return aggregated
@@ -112,16 +102,7 @@ class ElectricalTopologyStrategy(TopologyStrategy):
                     nodes1 = partition_map[cluster1]
                     nodes2 = partition_map[cluster2]
 
-                    has_connection = False
-                    for n1 in nodes1:
-                        for n2 in nodes2:
-                            if graph.has_edge(n1, n2):
-                                has_connection = True
-                                break
-                        if has_connection:
-                            break
-
-                    if has_connection:
+                    if self._clusters_connected(graph, nodes1, nodes2):
                         aggregated.add_edge(cluster1, cluster2)
 
             else:
