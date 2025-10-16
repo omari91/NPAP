@@ -83,6 +83,10 @@ class PartitioningManager:
             algorithm='dbscan',
             distance_metric='haversine'
         )
+        self._strategies['geographical_hierarchical'] = GeographicalPartitioning(
+            algorithm='hierarchical',
+            distance_metric='euclidean'
+        )
 
 
 class AggregationManager:

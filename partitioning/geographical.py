@@ -2,7 +2,7 @@ from typing import Dict, List, Any
 
 import networkx as nx
 import numpy as np
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
 from sklearn.metrics.pairwise import euclidean_distances, haversine_distances
 from sklearn_extra.cluster import KMedoids
 
@@ -24,7 +24,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         self.algorithm = algorithm
         self.distance_metric = distance_metric
 
-        if algorithm not in ['kmeans', 'kmedoids', 'dbscan']:
+        if algorithm not in ['kmeans', 'kmedoids', 'dbscan', 'hierarchical']:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
         if distance_metric not in ['haversine', 'euclidean']:
             raise ValueError(f"Unsupported distance metric: {distance_metric}")
@@ -67,6 +67,8 @@ class GeographicalPartitioning(PartitioningStrategy):
                 labels = self._kmedoids_clustering(coordinates, n_clusters, **kwargs)
             elif self.algorithm == 'dbscan':
                 labels = self._dbscan_clustering(coordinates, **kwargs)
+            elif self.algorithm == 'hierarchical':
+                labels = self._hierarchical_clustering(coordinates, n_clusters)
             else:
                 raise PartitioningError(f"Unknown algorithm: {self.algorithm}")
 
@@ -179,3 +181,23 @@ class GeographicalPartitioning(PartitioningStrategy):
 
         except Exception as e:
             raise PartitioningError(f"DBSCAN clustering failed: {e}") from e
+
+    def _hierarchical_clustering(self, coordinates: np.ndarray, n_clusters: int) -> np.ndarray:
+        """Perform Hierarchical Clustering on geographical coordinates."""
+        try:
+            # Ward linkage only works with Euclidean distance
+            if self.distance_metric != 'euclidean':
+                raise PartitioningError("Ward linkage for Hierarchical Clustering requires Euclidean distance.")
+
+            # Perform Agglomerative Clustering
+            agg_cluster = AgglomerativeClustering(
+                n_clusters=n_clusters,
+                metric=self.distance_metric,
+                linkage='ward'
+            )
+
+            labels = agg_cluster.fit_predict(coordinates)
+            return labels
+
+        except Exception as e:
+            raise PartitioningError(f"Hierarchical clustering failed: {e}") from e
