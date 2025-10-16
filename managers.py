@@ -87,6 +87,14 @@ class PartitioningManager:
             algorithm='hierarchical',
             distance_metric='euclidean'
         )
+        self._strategies['geographical_hdbscan_euclidean'] = GeographicalPartitioning(
+            algorithm='hdbscan',
+            distance_metric='euclidean'
+        )
+        self._strategies['geographical_hdbscan_haversine'] = GeographicalPartitioning(
+            algorithm='hdbscan',
+            distance_metric='haversine'
+        )
 
 
 class AggregationManager:

@@ -1,5 +1,6 @@
 from typing import Dict, List, Any
 
+import hdbscan
 import networkx as nx
 import numpy as np
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
@@ -24,7 +25,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         self.algorithm = algorithm
         self.distance_metric = distance_metric
 
-        if algorithm not in ['kmeans', 'kmedoids', 'dbscan', 'hierarchical']:
+        if algorithm not in ['kmeans', 'kmedoids', 'dbscan', 'hierarchical', 'hdbscan']:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
         if distance_metric not in ['haversine', 'euclidean']:
             raise ValueError(f"Unsupported distance metric: {distance_metric}")
@@ -69,6 +70,8 @@ class GeographicalPartitioning(PartitioningStrategy):
                 labels = self._dbscan_clustering(coordinates, **kwargs)
             elif self.algorithm == 'hierarchical':
                 labels = self._hierarchical_clustering(coordinates, n_clusters)
+            elif self.algorithm == 'hdbscan':
+                labels = self._hdbscan_clustering(coordinates, **kwargs)
             else:
                 raise PartitioningError(f"Unknown algorithm: {self.algorithm}")
 
@@ -201,3 +204,29 @@ class GeographicalPartitioning(PartitioningStrategy):
 
         except Exception as e:
             raise PartitioningError(f"Hierarchical clustering failed: {e}") from e
+
+    def _hdbscan_clustering(self, coordinates: np.ndarray, **kwargs) -> np.ndarray:
+        """Perform HDBSCAN clustering on geographical coordinates."""
+        try:
+            min_cluster_size = kwargs.get('min_cluster_size', 5)
+
+            # Calculate coordinates in radians if using Haversine distance
+            if self.distance_metric == 'euclidean':
+                coords_rad = np.radians(coordinates)
+            elif self.distance_metric == 'haversine':
+                coords_rad = np.radians(coordinates)
+            else:
+                raise PartitioningError(f"Unsupported distance metric for HDBSCAN: {self.distance_metric}")
+
+            # Perform HDBSCAN clustering
+            clusterer = hdbscan.HDBSCAN(
+                min_cluster_size=min_cluster_size,
+                metric=self.distance_metric,
+                core_dist_n_jobs=-1  # use all available CPU cores
+            )
+
+            labels = clusterer.fit_predict(coords_rad)
+            return labels
+
+        except Exception as e:
+            raise PartitioningError(f"HDBSCAN clustering failed: {e}") from e
