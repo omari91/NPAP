@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 import networkx as nx
 import pandas as pd
@@ -36,8 +37,10 @@ class CSVFilesStrategy(DataLoadingStrategy):
     def load(self, node_file: str, edge_file: str, **kwargs) -> nx.Graph:
         """Load graph from CSV files"""
         try:
+            delimiter = kwargs["delimiter"] if 'delimiter' in kwargs else ','
+
             # Load nodes
-            nodes_df = pd.read_csv(node_file, delimiter=";")
+            nodes_df = pd.read_csv(node_file, delimiter=delimiter)
             if nodes_df.empty:
                 raise DataLoadingError("Node file is empty", strategy="csv_files")
 
@@ -51,7 +54,7 @@ class CSVFilesStrategy(DataLoadingStrategy):
                 )
 
             # Load edges
-            edges_df = pd.read_csv(edge_file, delimiter=";")
+            edges_df = pd.read_csv(edge_file, delimiter=delimiter)
             if edges_df.empty:
                 raise DataLoadingError("Edge file is empty", strategy="csv_files")
 
