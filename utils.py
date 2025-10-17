@@ -101,12 +101,13 @@ def validate_graph_compatibility(partition_result, current_graph_hash: str):
         )
 
 
-def plot_network_on_map(graph):
+def interactive_plot(graph: nx.Graph, title: str = None):
     """
     Plots a NetworkX graph on an interactive map.
 
     Args:
         graph: A NetworkX graph with node and edge attributes.
+        title (Optional): Title for the plot.
     """
     import plotly.graph_objects as go
     import plotly.io as pio
@@ -157,7 +158,7 @@ def plot_network_on_map(graph):
     fig = go.Figure(data=[edge_trace, node_trace])
 
     fig.update_layout(
-        title_text='Power Network Graph',
+        title_text=title if title else 'Power Network Graph',
         hovermode='closest',
         showlegend=True,
         mapbox=dict(

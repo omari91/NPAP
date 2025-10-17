@@ -517,9 +517,9 @@ class PartitionAggregatorManager:
         if not self._current_graph and graph is None:
             raise ValueError("No graph loaded.")
 
-        from utils import plot_network_on_map
+        from utils import interactive_plot
 
         if graph is not None:
-            plot_network_on_map(graph)
+            interactive_plot(graph)
         else:
-            plot_network_on_map(self._current_graph)
+            interactive_plot(self._current_graph)
