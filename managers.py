@@ -302,7 +302,7 @@ class AggregationManager:
                     if profile.warn_on_defaults:
                         warnings.warn(
                             f"Node property '{prop}' not specified in profile. "
-                            f"Using default strategy '{profile.default_node_strategy}'"
+                            f"Using default aggregation strategy '{profile.default_node_strategy}'"
                         )
 
                     if profile.default_node_strategy in self._node_strategies:
@@ -359,7 +359,7 @@ class AggregationManager:
                     if profile.warn_on_defaults:
                         warnings.warn(
                             f"Edge property '{prop}' not specified in profile. "
-                            f"Using default strategy '{profile.default_edge_strategy}'"
+                            f"Using default aggregation strategy '{profile.default_edge_strategy}'"
                         )
 
                     if profile.default_edge_strategy in self._edge_strategies:
