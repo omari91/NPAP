@@ -164,9 +164,9 @@ def interactive_plot(graph: nx.Graph, title: str = None):
         mapbox=dict(
             style="carto-positron",
             bearing=0,
-            center=dict(lat=50.5, lon=14.0),
+            center=dict(lat=57.5, lon=14.0),
             pitch=0,
-            zoom=3.5
+            zoom=3.7
         ),
         margin={"r": 0, "t": 40, "l": 0, "b": 0}
     )
