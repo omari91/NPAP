@@ -34,16 +34,27 @@ class NetworkXDirectStrategy(DataLoadingStrategy):
         return True
 
     def load(self, graph: nx.Graph, **kwargs) -> nx.Graph:
-        """Use graph directly (create a copy to avoid mutations)"""
+        """Use graph directly (supports Graph and MultiGraph, creates a copy)"""
         try:
-            # Convert to simple Graph if needed and create copy
-            if isinstance(graph, nx.Graph):
-                result = graph.copy()
-            else:
-                # Convert other graph types to simple Graph
-                result = nx.Graph()
+            if  isinstance(graph, (nx.MultiGraph, nx.MultiDiGraph)):
+                # Inform user about MultiGraph
+                print("MULTIGRAPH DETECTED: Parallel edges found in the data.")
+                print("The loaded graph contains multiple edges between the same node pairs. MultiGraphs cannot be "
+                      "partitioned directly. Call manager.aggregate_parallel_edges() to collapse parallel edges")
+
+                # Create copy as MultiGraph
+                result = nx.MultiGraph()
                 result.add_nodes_from(graph.nodes(data=True))
-                result.add_edges_from(graph.edges(data=True))
+                result.add_edges_from(graph.edges(data=True, keys=True))
+            else:
+                # Convert to simple Graph if needed and create copy
+                if isinstance(graph, nx.Graph):
+                    result = graph.copy()
+                else:
+                    # Convert DiGraph to Graph
+                    result = nx.Graph()
+                    result.add_nodes_from(graph.nodes(data=True))
+                    result.add_edges_from(graph.edges(data=True))
 
             # Validate the copied graph
             if len(list(result.nodes())) == 0:
