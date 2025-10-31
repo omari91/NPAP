@@ -246,3 +246,62 @@ class FirstEdgeStrategy(EdgePropertyStrategy):
                 f"Failed to get first edge property '{property_name}': {e}",
                 strategy="first"
             ) from e
+
+
+class EquivalentReactanceStrategy(EdgePropertyStrategy):
+    """
+    Aggregates reactance for a set of parallel edges.
+
+    This strategy calculates the equivalent reactance by first converting
+    each edge's reactance (x) to susceptance (b = 1/x), summing the
+    susceptances, and then converting the total susceptance back
+    to an equivalent reactance (x_eq = 1 / b_eq).
+
+    This correctly models the physics of parallel lines as:
+    b_eq = b_1 + b_2 + ...
+    x_eq = 1 / b_eq
+    """
+
+    def aggregate_property(self, original_edges: List[Dict[str, Any]], property_name: str) -> Any:
+        """
+        Calculate the equivalent reactance for the given parallel edges.
+
+        Returns:
+            Equivalent reactance value, or float('inf') if no edges exist
+        """
+        try:
+            total_susceptance = 0.0
+            has_valid_property = False
+            epsilon = 1e-10  # Numerical tolerance for zero comparison
+
+            for edge_data in original_edges:
+                if property_name in edge_data:
+                    reactance = edge_data[property_name]
+
+                    if isinstance(reactance, (int, float)):
+                        has_valid_property = True
+
+                        if abs(reactance) < epsilon:
+                            # A 0-reactance line (short circuit)
+                            # makes the entire parallel group a short circuit.
+                            return 0.0
+
+                        # Add this line's susceptance (handles negative reactance for capacitive elements)
+                        total_susceptance += (1.0 / reactance)
+
+            if not has_valid_property:
+                # No edges had this property - equivalent to open circuit (no connection)
+                return float('inf')
+
+            if abs(total_susceptance) < epsilon:
+                # This means all valid edges had infinite reactance (open circuit).
+                # The equivalent is also an open circuit.
+                return float('inf')
+
+            # Return the equivalent reactance
+            return 1.0 / total_susceptance
+        except Exception as e:
+            raise AggregationError(
+                f"Failed to calculate equivalent reactance for '{property_name}': {e}",
+                strategy="equivalent_reactance"
+            ) from e

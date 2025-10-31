@@ -486,7 +486,7 @@ class AggregationManager:
         from aggregation.basic_strategies import (
             SimpleTopologyStrategy, ElectricalTopologyStrategy,
             SumNodeStrategy, AverageNodeStrategy, FirstNodeStrategy,
-            SumEdgeStrategy, AverageEdgeStrategy, FirstEdgeStrategy
+            SumEdgeStrategy, AverageEdgeStrategy, FirstEdgeStrategy, EquivalentReactanceStrategy
         )
         from aggregation.physical_strategies import (
             KronReductionStrategy
@@ -508,6 +508,7 @@ class AggregationManager:
         self._edge_strategies['sum'] = SumEdgeStrategy()
         self._edge_strategies['average'] = AverageEdgeStrategy()
         self._edge_strategies['first'] = FirstEdgeStrategy()
+        self._edge_strategies['equivalent_reactance'] = EquivalentReactanceStrategy()
 
 
 class PartitionAggregatorManager:
