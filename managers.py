@@ -62,7 +62,9 @@ class PartitioningManager:
     def _register_default_strategies(self):
         """Register built-in partitioning strategies"""
         from partitioning.geographical import GeographicalPartitioning
+        from partitioning.electrical import ElectricalDistancePartitioning
 
+        # Geographical distance partitioning strategies
         self._strategies['geographical_kmeans'] = GeographicalPartitioning(
             algorithm='kmeans',
             distance_metric='euclidean'
@@ -94,6 +96,14 @@ class PartitioningManager:
         self._strategies['geographical_hdbscan_haversine'] = GeographicalPartitioning(
             algorithm='hdbscan',
             distance_metric='haversine'
+        )
+
+        # Electrical distance partitioning strategies
+        self._strategies['electrical_kmeans'] = ElectricalDistancePartitioning(
+            algorithm='kmeans'
+        )
+        self._strategies['electrical_kmedoids'] = ElectricalDistancePartitioning(
+            algorithm='kmedoids'
         )
 
 
