@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
 
 import networkx as nx
 import numpy as np
@@ -7,6 +7,28 @@ from sklearn_extra.cluster import KMedoids
 
 from exceptions import PartitioningError
 from interfaces import PartitioningStrategy
+
+
+@dataclass
+class ElectricalDistanceConfig:
+    """
+    Configuration parameters for electrical distance calculations.
+
+    Centralizes all magic numbers and tolerances used in the electrical
+    distance partitioning algorithm for better maintainability and tuning.
+
+    Attributes:
+        regularization: Small value added to B matrix diagonal for numerical stability
+        zero_reactance_replacement: Reactance value used when edge reactance is zero
+        slack_distance_fallback: Default distance value when no valid distances exist
+        numerical_tolerance: Threshold for considering values as zero
+        negative_distance_threshold: Threshold for warning about negative distance squared
+    """
+    regularization: float = 1e-10
+    zero_reactance_replacement: float = 1e-5
+    slack_distance_fallback: float = 1.0
+    numerical_tolerance: float = 1e-10
+    negative_distance_threshold: float = -1e-10
 
 
 class ElectricalDistancePartitioning(PartitioningStrategy):
@@ -24,16 +46,19 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
     - Electrical distance: d_ij = sqrt((B^-1_ii + B^-1_jj - 2*B^-1_ij))
     """
 
-    def __init__(self, algorithm: str = 'kmeans', slack_bus: Optional[Any] = None):
+    def __init__(self, algorithm: str = 'kmeans', slack_bus: Optional[Any] = None,
+                 config: Optional[ElectricalDistanceConfig] = None):
         """
         Initialize electrical distance partitioning strategy.
 
         Args:
             algorithm: Clustering algorithm ('kmeans', 'kmedoids')
             slack_bus: Specific node to use as slack bus, or None for auto-selection
+            config: Configuration parameters for distance calculations
         """
         self.algorithm = algorithm
         self.slack_bus = slack_bus
+        self.config = config or ElectricalDistanceConfig()
 
         if algorithm not in ['kmeans', 'kmedoids']:
             raise ValueError(
