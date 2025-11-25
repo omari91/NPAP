@@ -21,12 +21,10 @@ class ElectricalDistanceConfig:
     Attributes:
         zero_reactance_replacement: Reactance value used when edge reactance is zero
         slack_distance_fallback: Default distance value when no valid distances exist
-        numerical_tolerance: Threshold for considering values as zero
         negative_distance_threshold: Threshold for warning about negative distance squared
     """
     zero_reactance_replacement: float = 1e-5
     slack_distance_fallback: float = 1.0
-    numerical_tolerance: float = 1e-10
     negative_distance_threshold: float = -1e-10
 
 
