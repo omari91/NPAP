@@ -19,13 +19,11 @@ class ElectricalDistanceConfig:
     distance partitioning algorithm for better maintainability and tuning.
 
     Attributes:
-        regularization: Small value added to B matrix diagonal for numerical stability
         zero_reactance_replacement: Reactance value used when edge reactance is zero
         slack_distance_fallback: Default distance value when no valid distances exist
         numerical_tolerance: Threshold for considering values as zero
         negative_distance_threshold: Threshold for warning about negative distance squared
     """
-    regularization: float = 1e-10
     zero_reactance_replacement: float = 1e-5
     slack_distance_fallback: float = 1.0
     numerical_tolerance: float = 1e-10
@@ -249,9 +247,6 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
             # Ensure B matrix is symmetric (fix numerical errors from floating-point operations)
             B_matrix = (B_matrix + B_matrix.T) / 2.0
-
-            # Add small regularization for numerical stability
-            B_matrix += self.config.regularization * np.eye(B_matrix.shape[0])
 
             return B_matrix, active_nodes
 
