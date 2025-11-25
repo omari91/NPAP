@@ -209,6 +209,33 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
         return distance_matrix_full
 
+    def _select_slack_bus(self, graph: nx.Graph, nodes: List[Any]) -> Any:
+        """
+        Select slack bus node.
+
+        If slack_bus is specified, use it. Otherwise, select the node
+        with the highest degree (most connections).
+
+        Args:
+            graph: NetworkX graph
+            nodes: List of nodes
+
+        Returns:
+            Selected slack bus node
+        """
+        if self.slack_bus is not None:
+            if self.slack_bus not in nodes:
+                raise PartitioningError(
+                    f"Specified slack bus {self.slack_bus} not found in graph.",
+                    strategy=f"electrical_{self.algorithm}"
+                )
+            return self.slack_bus
+
+        # Auto-select: node with the highest degree
+        degrees = dict(graph.degree())
+        slack = max(nodes, key=lambda n: degrees[n])
+        return slack
+
     def _build_susceptance_matrix(self, graph: nx.Graph, nodes: List[Any],
                                   slack_bus: Any) -> Tuple[np.ndarray, List[Any]]:
         """
@@ -386,33 +413,6 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             )
 
         return distance_matrix_full
-
-    def _select_slack_bus(self, graph: nx.Graph, nodes: List[Any]) -> Any:
-        """
-        Select slack bus node.
-
-        If slack_bus is specified, use it. Otherwise, select the node
-        with the highest degree (most connections).
-
-        Args:
-            graph: NetworkX graph
-            nodes: List of nodes
-
-        Returns:
-            Selected slack bus node
-        """
-        if self.slack_bus is not None:
-            if self.slack_bus not in nodes:
-                raise PartitioningError(
-                    f"Specified slack bus {self.slack_bus} not found in graph.",
-                    strategy=f"electrical_{self.algorithm}"
-                )
-            return self.slack_bus
-
-        # Auto-select: node with the highest degree
-        degrees = dict(graph.degree())
-        slack = max(nodes, key=lambda n: degrees[n])
-        return slack
 
     @staticmethod
     def _build_slack_bus_adjusted_incidence_matrix(graph: nx.Graph,
