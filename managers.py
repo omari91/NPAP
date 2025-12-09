@@ -35,9 +35,11 @@ class InputDataManager:
         """Register built-in loading strategies"""
         from input.csv_loader import CSVFilesStrategy
         from input.networkx_loader import NetworkXDirectStrategy
+        from input.va_loader import VoltageAwareStrategy
 
         self._strategies['csv_files'] = CSVFilesStrategy()
         self._strategies['networkx_direct'] = NetworkXDirectStrategy()
+        self._strategies['va_loader'] = VoltageAwareStrategy()
 
 
 class PartitioningManager:
@@ -674,7 +676,7 @@ class PartitionAggregatorManager:
         """
         Execute complete workflow without storing intermediates
 
-        If a MultiGraph is loaded, parallel edges will be automatically aggregated
+        If a MultiDiGraph is loaded, parallel edges will be automatically aggregated
         before partitioning.
 
         Args:
@@ -689,8 +691,9 @@ class PartitionAggregatorManager:
         """
         # Parameters for data loading
         data_params = {k: v for k, v in kwargs.items()
-                       if k in ['node_file', 'edge_file', 'graph', 'connection_string', 'table_prefix',
-                                'delimiter', 'decimal', 'node_id_col', 'edge_from_col', 'edge_to_col']}
+                       if k in ['node_file', 'edge_file', 'line_file', 'transformer_file',
+                                'graph', 'connection_string', 'table_prefix',
+                                'delimiter', 'decimal', 'node_id_col', 'edge_from_col', 'edge_to_col',
                                 'bidirectional']}
 
         # Parameters for parallel edge aggregation (if MultiDiGraph)

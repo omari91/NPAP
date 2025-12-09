@@ -145,9 +145,9 @@ class CSVFilesStrategy(DataLoadingStrategy):
     def _detect_edge_column(df: pd.DataFrame, direction: str) -> str:
         """Detect from/to columns for edges"""
         if direction == 'from':
-            candidates = ['from', 'source', 'from_node', 'source_node', 'node1', 'start']
+            candidates = ['from', 'source', 'from_node', 'source_node', 'node1', 'start', 'bus0']
         else:  # direction == 'to'
-            candidates = ['to', 'target', 'to_node', 'target_node', 'node2', 'end']
+            candidates = ['to', 'target', 'to_node', 'target_node', 'node2', 'end', 'bus1']
 
         for candidate in candidates:
             if candidate in df.columns:
