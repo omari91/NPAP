@@ -733,14 +733,62 @@ class PartitionAggregatorManager:
         from utils import compute_graph_hash
         return compute_graph_hash(graph)
 
-    def plot_network_on_map(self, graph: nx.DiGraph = None):
-        """Plot current graph on geographical map if coordinates are available"""
-        if not self._current_graph and graph is None:
-            raise ValueError("No graph loaded.")
+    def plot_network(self, style: str = 'simple', graph: nx.DiGraph = None,
+                     show: bool = True, **kwargs):
+        """
+        Plot the network on an interactive map.
 
-        from utils import interactive_plot
+        Args:
+            style: Plot style
+                - 'simple': All edges same color (fast, minimal)
+                - 'voltage_aware': Edges colored by type (line/trafo/dc_link),
+                                   thickness by voltage level
+                - 'clustered': Nodes colored by cluster assignment (requires
+                               prior partitioning)
+            graph: Optional graph to plot (uses current graph if not provided)
+            show: Whether to display immediately (default: True)
+            **kwargs: Additional configuration options:
+                - show_lines: bool = True
+                - show_trafos: bool = True
+                - show_dc_links: bool = True
+                - show_nodes: bool = True
+                - line_high_voltage_color: str = "#029E73" (green)
+                - line_low_voltage_color: str = "#CA9161" (brown)
+                - trafo_color: str = "#ECE133" (yellow)
+                - dc_link_color: str = "#CC78BC" (pink)
+                - node_color: str = "#0173B2" (blue)
+                - edge_width: float = 1.5
+                - node_size: int = 5
+                - title: str = None
+                - map_style: str = "carto-positron"
+                - map_center_lat: float = 57.5
+                - map_center_lon: float = 14.0
+                - map_zoom: float = 3.7
+                - cluster_colorscale: str = "Viridis" (for clustered style)
 
-        if graph is not None:
-            interactive_plot(graph)
-        else:
-            interactive_plot(self._current_graph)
+        Returns:
+            Plotly Figure object
+        """
+        from visualization import plot_network
+
+        target_graph = graph if graph is not None else self._current_graph
+        if target_graph is None:
+            raise ValueError("No graph loaded. Call load_data() first.")
+
+        # For clustered style, pass the partition map
+        partition_map = None
+        if style == 'clustered':
+            if self._current_partition is None:
+                raise ValueError(
+                    "Cannot create clustered plot without partitioning. "
+                    "Call partition() first."
+                )
+            partition_map = self._current_partition.mapping
+
+        return plot_network(
+            graph=target_graph,
+            style=style,
+            partition_map=partition_map,
+            show=show,
+            **kwargs
+        )
