@@ -3,6 +3,7 @@ from typing import Dict, List, Any, Optional, Tuple
 
 import networkx as nx
 import numpy as np
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import euclidean_distances, haversine_distances
 from sklearn_extra.cluster import KMedoids
 
@@ -27,10 +28,16 @@ class VAGeographicalConfig:
                               matrix with infinite distances between voltage levels.
                               If True, clusters each voltage island independently
                               with proportional cluster distribution.
+        hierarchical_linkage: Linkage criterion for hierarchical clustering.
+                             Must be 'complete', 'average', or 'single'.
+                             Note: 'ward' is NOT supported with precomputed distances.
+                             Default is 'complete' which works well with infinite
+                             distances (prevents cross-voltage merging).
     """
     voltage_tolerance: float = 1.0
     infinite_distance: float = 1e4
     proportional_clustering: bool = False
+    hierarchical_linkage: str = 'complete'
 
 
 class VAGeographicalPartitioning(PartitioningStrategy):
@@ -63,6 +70,9 @@ class VAGeographicalPartitioning(PartitioningStrategy):
 
     Supported algorithms:
         - 'kmedoids': K-Medoids clustering (works naturally with precomputed distances)
+        - 'hierarchical': Agglomerative clustering with precomputed distances
+                         (uses 'complete' linkage by default, configurable)
+
     Example distance matrix for N=4 nodes (2 at 220kV, 2 at 380kV):
         ( 0.0,   X,   inf, inf )
         ( X,   0.0,   inf, inf )
@@ -72,8 +82,9 @@ class VAGeographicalPartitioning(PartitioningStrategy):
     Where X and Y are actual geographical distances within voltage islands.
     """
 
-    SUPPORTED_ALGORITHMS = ['kmedoids']
+    SUPPORTED_ALGORITHMS = ['kmedoids', 'hierarchical']
     SUPPORTED_DISTANCE_METRICS = ['euclidean', 'haversine']
+    SUPPORTED_LINKAGES = ['complete', 'average', 'single']
 
     def __init__(self, algorithm: str = 'kmedoids',
                  distance_metric: str = 'euclidean',
@@ -85,7 +96,7 @@ class VAGeographicalPartitioning(PartitioningStrategy):
         Args:
             algorithm: Clustering algorithm. Supported options:
                       - 'kmedoids': K-Medoids (robust, works with precomputed distances)
-                      distance matrices.
+                      - 'hierarchical': Agglomerative clustering (uses linkage from config)
             distance_metric: Distance metric for geographical distances.
                            'euclidean' for flat/projected coordinates,
                            'haversine' for great-circle distance on Earth.
@@ -93,7 +104,7 @@ class VAGeographicalPartitioning(PartitioningStrategy):
             config: Configuration parameters for the algorithm.
 
         Raises:
-            ValueError: If unsupported algorithm or distance metric is specified.
+            ValueError: If unsupported algorithm, distance metric, or linkage is specified.
         """
         self.algorithm = algorithm
         self.distance_metric = distance_metric
@@ -112,8 +123,12 @@ class VAGeographicalPartitioning(PartitioningStrategy):
                 f"Supported: {', '.join(self.SUPPORTED_DISTANCE_METRICS)}"
             )
 
-        if distance_metric not in ['euclidean', 'haversine']:
-            raise ValueError(f"Unsupported distance metric: {distance_metric}")
+        if self.config.hierarchical_linkage not in self.SUPPORTED_LINKAGES:
+            raise ValueError(
+                f"Unsupported hierarchical linkage: {self.config.hierarchical_linkage}. "
+                f"Supported: {', '.join(self.SUPPORTED_LINKAGES)}. "
+                "Note: 'ward' linkage is not supported with precomputed distance matrices."
+            )
 
     @property
     def required_attributes(self) -> Dict[str, List[str]]:
@@ -206,10 +221,6 @@ class VAGeographicalPartitioning(PartitioningStrategy):
         """Get descriptive strategy name for error messages."""
         mode = "proportional" if self.config.proportional_clustering else "standard"
         return f"va_geographical_{mode}_{self.algorithm}"
-
-    # =========================================================================
-    # STANDARD MODE: Single clustering with infinite distances
-    # =========================================================================
 
     def _standard_partition(self, nodes: List[Any], coordinates: np.ndarray,
                             voltages: np.ndarray, **kwargs) -> Dict[int, List[Any]]:
@@ -385,6 +396,12 @@ class VAGeographicalPartitioning(PartitioningStrategy):
         """
         if self.algorithm == 'kmedoids':
             return self._kmedoids_clustering(distance_matrix, **kwargs)
+        elif self.algorithm == 'hierarchical':
+            return self._hierarchical_clustering(
+                distance_matrix,
+                linkage=self.config.hierarchical_linkage,
+                **kwargs
+            )
         else:
             raise PartitioningError(
                 f"Unknown algorithm: {self.algorithm}",
@@ -433,6 +450,47 @@ class VAGeographicalPartitioning(PartitioningStrategy):
                 strategy="va_geographical_kmedoids"
             ) from e
 
+    @staticmethod
+    def _hierarchical_clustering(distance_matrix: np.ndarray,
+                                 linkage: str = 'complete',
+                                 **kwargs) -> np.ndarray:
+        """
+        Perform hierarchical (agglomerative) clustering with precomputed distance matrix.
+
+        Hierarchical clustering builds a tree of clusters and is deterministic
+        (no random seed needed). With 'complete' linkage, it handles infinite
+        distances well by preventing merges across voltage levels.
+
+        Args:
+            distance_matrix: Precomputed distance matrix (n x n)
+            linkage: Linkage criterion ('complete', 'average', 'single').
+                    Note: 'ward' is not supported with precomputed distances.
+            **kwargs: Clustering parameters:
+                - n_clusters: Number of clusters (required)
+
+        Returns:
+            Array of cluster labels for each node
+
+        Raises:
+            PartitioningError: If clustering fails.
+        """
+        try:
+            n_clusters = kwargs.get('n_clusters')
+
+            clustering = AgglomerativeClustering(
+                n_clusters=n_clusters,
+                metric='precomputed',
+                linkage=linkage
+            )
+
+            labels = clustering.fit_predict(distance_matrix)
+            return labels
+
+        except Exception as e:
+            raise PartitioningError(
+                f"Hierarchical clustering failed: {e}",
+                strategy="va_geographical_hierarchical"
+            ) from e
 
     # =========================================================================
     # SHARED UTILITIES
