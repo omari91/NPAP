@@ -119,6 +119,10 @@ class PartitioningManager:
             algorithm='kmedoids',
             distance_metric='haversine'
         )
+        self._strategies['va_geographical_hierarchical'] = VAGeographicalPartitioning(
+            algorithm='hierarchical',
+            distance_metric='haversine'
+        )
 
         # Voltage-Aware Geographical partitioning strategies - Proportional mode
         self._strategies['va_geographical_proportional_kmedoids_euclidean'] = VAGeographicalPartitioning(
@@ -128,6 +132,11 @@ class PartitioningManager:
         )
         self._strategies['va_geographical_proportional_kmedoids_haversine'] = VAGeographicalPartitioning(
             algorithm='kmedoids',
+            distance_metric='haversine',
+            config=VAGeographicalConfig(proportional_clustering=True)
+        )
+        self._strategies['va_geographical_proportional_hierarchical'] = VAGeographicalPartitioning(
+            algorithm='hierarchical',
             distance_metric='haversine',
             config=VAGeographicalConfig(proportional_clustering=True)
         )
