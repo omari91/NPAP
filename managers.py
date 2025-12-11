@@ -803,3 +803,164 @@ class PartitionAggregatorManager:
             show=show,
             **kwargs
         )
+
+    def group_by_voltage_levels(self, target_levels: List[float],
+                                voltage_attr: str = 'voltage',
+                                store_original: bool = True,
+                                handle_missing: str = 'infer') -> Dict[str, Any]:
+        """
+        Group buses voltage levels to predefined target values.
+
+        This method reassigns each node's voltage to the nearest target voltage level,
+        creating clean voltage "islands" for subsequent voltage-aware partitioning.
+
+        Args:
+            target_levels: List of target voltage levels (kV) to harmonize to.
+                          Example: [220, 380] for European transmission grid.
+            voltage_attr: Node attribute containing voltage level (default: 'voltage').
+            store_original: If True, stores original voltage in 'original_{voltage_attr}'.
+            handle_missing: How to handle nodes without voltage data:
+                           - 'infer': Infer from connected neighbors (via edges)
+                           - 'nearest': Assign to nearest target level (arbitrary)
+                           - 'error': Raise an error
+                           - 'skip': Leave as None (will form separate cluster)
+
+        Returns:
+            Summary dict with:
+                - 'total_nodes': Total number of nodes processed
+                - 'reassignments': Dict mapping original_voltage -> (target_voltage, count)
+                - 'missing_handled': Number of nodes with missing voltage
+                - 'voltage_distribution': Dict mapping target_voltage -> node_count
+
+        Raises:
+            ValueError: If no graph loaded, target_levels empty, or handle_missing='error'
+                       with missing voltages.
+        """
+        if not self._current_graph:
+            raise ValueError("No graph loaded. Call load_data() first.")
+
+        if not target_levels:
+            raise ValueError("target_levels cannot be empty.")
+
+        target_levels = sorted(target_levels)  # Sort for consistent behavior
+        graph = self._current_graph
+
+        # Statistics tracking
+        reassignments: Dict[Any, Tuple[float, int]] = {}  # original -> (target, count)
+        missing_nodes: List[Any] = []
+        voltage_distribution: Dict[float, int] = {level: 0 for level in target_levels}
+
+        # First pass: identify missing voltages and reassign known ones
+        for node in graph.nodes():
+            node_data = graph.nodes[node]
+            original_voltage = node_data.get(voltage_attr)
+
+            # Try fallback attributes
+            if original_voltage is None:
+                original_voltage = node_data.get('voltage', node_data.get('v_nom'))
+
+            if original_voltage is None:
+                missing_nodes.append(node)
+                continue
+
+            # Store original if requested
+            if store_original:
+                node_data[f'original_{voltage_attr}'] = original_voltage
+
+            # Find nearest target level
+            if isinstance(original_voltage, (int, float)):
+                target = min(target_levels, key=lambda t: abs(t - original_voltage))
+            else:
+                # Non-numeric voltage - try to parse or skip
+                try:
+                    numeric_v = float(original_voltage)
+                    target = min(target_levels, key=lambda t: abs(t - numeric_v))
+                except (ValueError, TypeError):
+                    missing_nodes.append(node)
+                    continue
+
+            # Reassign
+            node_data[voltage_attr] = target
+            voltage_distribution[target] += 1
+
+            # Track reassignment
+            orig_key = round(original_voltage, 1) if isinstance(original_voltage, float) else original_voltage
+            if orig_key not in reassignments:
+                reassignments[orig_key] = (target, 0)
+            reassignments[orig_key] = (reassignments[orig_key][0], reassignments[orig_key][1] + 1)
+
+        # Handle missing voltages
+        if missing_nodes:
+            if handle_missing == 'error':
+                raise ValueError(
+                    f"{len(missing_nodes)} nodes have missing voltage data. "
+                    f"First few: {missing_nodes[:5]}"
+                )
+
+            elif handle_missing == 'infer':
+                # Infer from connected neighbors
+                inferred_count = 0
+                still_missing = []
+
+                for node in missing_nodes:
+                    neighbor_voltages = []
+                    for neighbor in graph.neighbors(node):
+                        nv = graph.nodes[neighbor].get(voltage_attr)
+                        if nv is not None and nv in target_levels:
+                            neighbor_voltages.append(nv)
+
+                    # Also check predecessors for directed graphs
+                    if hasattr(graph, 'predecessors'):
+                        for pred in graph.predecessors(node):
+                            pv = graph.nodes[pred].get(voltage_attr)
+                            if pv is not None and pv in target_levels:
+                                neighbor_voltages.append(pv)
+
+                    if neighbor_voltages:
+                        # Use most common neighbor voltage
+                        from collections import Counter
+                        target = Counter(neighbor_voltages).most_common(1)[0][0]
+                        graph.nodes[node][voltage_attr] = target
+                        if store_original:
+                            graph.nodes[node][f'original_{voltage_attr}'] = None
+                        voltage_distribution[target] += 1
+                        inferred_count += 1
+                    else:
+                        still_missing.append(node)
+
+                if still_missing:
+                    print(f"Warning: {len(still_missing)} nodes could not be inferred. "
+                          f"Assigning to nearest target level.")
+                    # Assign remaining to first target level (arbitrary but consistent)
+                    default_target = target_levels[0]
+                    for node in still_missing:
+                        graph.nodes[node][voltage_attr] = default_target
+                        if store_original:
+                            graph.nodes[node][f'original_{voltage_attr}'] = None
+                        voltage_distribution[default_target] += 1
+
+                print(f"Inferred voltage for {inferred_count} nodes from neighbors.")
+
+            elif handle_missing == 'nearest':
+                # Assign to first target level (arbitrary)
+                default_target = target_levels[0]
+                for node in missing_nodes:
+                    graph.nodes[node][voltage_attr] = default_target
+                    if store_original:
+                        graph.nodes[node][f'original_{voltage_attr}'] = None
+                    voltage_distribution[default_target] += 1
+
+            elif handle_missing == 'skip':
+                # Leave as None - will form separate cluster
+                print(f"Warning: {len(missing_nodes)} nodes have no voltage (will cluster separately).")
+
+        # Update graph hash since we modified node attributes
+        self._current_graph_hash = self._compute_graph_hash(self._current_graph)
+
+        return {
+            'total_nodes': len(list(graph.nodes())),
+            'reassignments': reassignments,
+            'missing_handled': len(missing_nodes),
+            'voltage_distribution': voltage_distribution,
+            'target_levels': target_levels
+        }
