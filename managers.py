@@ -65,6 +65,7 @@ class PartitioningManager:
         """Register built-in partitioning strategies"""
         from partitioning.geographical import GeographicalPartitioning
         from partitioning.electrical import ElectricalDistancePartitioning
+        from partitioning.va_geographical import VAGeographicalPartitioning
 
         # Geographical distance partitioning strategies
         self._strategies['geographical_kmeans'] = GeographicalPartitioning(
@@ -106,6 +107,16 @@ class PartitioningManager:
         )
         self._strategies['electrical_kmedoids'] = ElectricalDistancePartitioning(
             algorithm='kmedoids'
+        )
+
+        # Voltage-Aware Geographical partitioning strategies
+        self._strategies['va_geographical_kmedoids_euclidean'] = VAGeographicalPartitioning(
+            algorithm='kmedoids',
+            distance_metric='euclidean'
+        )
+        self._strategies['va_geographical_kmedoids_haversine'] = VAGeographicalPartitioning(
+            algorithm='kmedoids',
+            distance_metric='haversine'
         )
 
 
