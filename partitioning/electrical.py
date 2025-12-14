@@ -5,11 +5,14 @@ from typing import Dict, List, Any, Optional, Tuple
 import networkx as nx
 import numpy as np
 from scipy import sparse
-from sklearn.cluster import KMeans
-from sklearn_extra.cluster import KMedoids
 
 from exceptions import PartitioningError
 from interfaces import PartitioningStrategy
+from utils import (
+    with_runtime_config,
+    create_partition_map, validate_partition,
+    run_kmeans, run_kmedoids
+)
 
 
 @dataclass
@@ -49,9 +52,25 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
     - Build incidence matrix K from directed network topology
     - Calculate susceptance matrix B = K^T · diag{b} · K
     - Electrical distance: d_ij = sqrt((B^-1_ii + B^-1_jj - 2*B^-1_ij))
+
+    Configuration can be provided at:
+    - Instantiation time (via `config` parameter in __init__)
+    - Partition time (via `config` or individual parameters in partition())
+
+    Partition-time parameters override instance defaults for that call only.
     """
 
     SUPPORTED_ALGORITHMS = ['kmeans', 'kmedoids']
+
+    # Config parameter names for runtime override detection
+    _CONFIG_PARAMS = {
+        'zero_reactance_replacement',
+        'slack_distance_fallback',
+        'negative_distance_threshold',
+        'use_sparse',
+        'sparse_threshold',
+        'condition_number_threshold'
+    }
 
     def __init__(self, algorithm: str = 'kmeans', slack_bus: Optional[Any] = None,
                  config: Optional[ElectricalDistanceConfig] = None):
@@ -84,6 +103,11 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             'edges': ['x']  # Reactance attribute required on edges
         }
 
+    def _get_strategy_name(self) -> str:
+        """Get descriptive strategy name for error messages."""
+        return f"electrical_{self.algorithm}"
+
+    @with_runtime_config(ElectricalDistanceConfig, _CONFIG_PARAMS)
     def partition(self, graph: nx.DiGraph, **kwargs) -> Dict[int, List[Any]]:
         """
         Partition nodes based on electrical distance.
@@ -94,6 +118,13 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                 - n_clusters: Number of clusters (required)
                 - random_state: Random seed for reproducibility
                 - max_iter: Maximum iterations for clustering
+                - config: ElectricalDistanceConfig instance to override instance config
+                - slack_bus: Override the slack bus for this partition call
+                - zero_reactance_replacement: Override config parameter
+                - slack_distance_fallback: Override config parameter
+                - negative_distance_threshold: Override config parameter
+                - use_sparse: Override config parameter
+                - sparse_threshold: Override config parameter
 
         Returns:
             Dictionary mapping cluster_id -> list of node_ids
@@ -102,6 +133,12 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             PartitioningError: If partitioning fails
         """
         try:
+            # Get effective config (injected by decorator)
+            effective_config = kwargs.get('_effective_config', self.config)
+
+            # Resolve slack bus (kwargs override instance default)
+            effective_slack = kwargs.get('slack_bus', self.slack_bus)
+
             self._validate_network_connectivity(graph)
 
             n_clusters = kwargs.get('n_clusters')
@@ -121,16 +158,16 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                 )
 
             # Calculate electrical distance matrix
-            distance_matrix = self._calculate_electrical_distance_matrix(graph, nodes)
+            distance_matrix = self._calculate_electrical_distance_matrix(
+                graph, nodes, effective_config, effective_slack
+            )
 
-            # Perform clustering
+            # Perform clustering using utility functions
             labels = self._run_clustering(distance_matrix, **kwargs)
 
-            # Create partition mapping
-            partition_map = self._create_partition_map(nodes, labels)
-
-            # Validate result
-            self._validate_partition(partition_map, n_nodes)
+            # Create and validate partition using utility functions
+            partition_map = create_partition_map(nodes, labels)
+            validate_partition(partition_map, n_nodes, self._get_strategy_name())
 
             return partition_map
 
@@ -143,9 +180,22 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                 graph_info={'nodes': len(list(graph.nodes())), 'edges': len(graph.edges())}
             ) from e
 
-    def _get_strategy_name(self) -> str:
-        """Get descriptive strategy name for error messages."""
-        return f"electrical_{self.algorithm}"
+    def _run_clustering(self, distance_matrix: np.ndarray, **kwargs) -> np.ndarray:
+        """Dispatch to appropriate clustering algorithm."""
+        n_clusters = kwargs.get('n_clusters')
+        random_state = kwargs.get('random_state', 42)
+        max_iter = kwargs.get('max_iter', 300)
+
+        if self.algorithm == 'kmeans':
+            # K-means uses distance matrix rows as feature vectors
+            return run_kmeans(distance_matrix, n_clusters, random_state, max_iter)
+        elif self.algorithm == 'kmedoids':
+            return run_kmedoids(distance_matrix, n_clusters, random_state, max_iter)
+        else:
+            raise PartitioningError(
+                f"Unknown algorithm: {self.algorithm}",
+                strategy=self._get_strategy_name()
+            )
 
     def _validate_network_connectivity(self, graph: nx.DiGraph) -> None:
         """
@@ -173,12 +223,12 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                 }
             )
 
-    def _calculate_electrical_distance_matrix(self, graph: nx.DiGraph,
-                                              nodes: List[Any]) -> np.ndarray:
+    def _calculate_electrical_distance_matrix(self, graph: nx.DiGraph, nodes: List[Any],
+                                              config: ElectricalDistanceConfig, slack_bus: Optional[Any]) -> np.ndarray:
         """
         Calculate electrical distance matrix between all node pairs.
 
-        This method orchestrates the calculation by:
+        Orchestrates the calculation by:
         1. Building the susceptance matrix (B matrix)
         2. Inverting the B matrix to get impedance matrix
         3. Computing distances from the impedance matrix
@@ -187,6 +237,8 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         Args:
             graph: NetworkX DiGraph with reactance on edges
             nodes: Ordered list of nodes
+            config: ElectricalDistanceConfig instance
+            slack_bus: Optional specified slack bus
 
         Returns:
             Symmetric distance matrix (n_nodes × n_nodes)
@@ -194,25 +246,28 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         Raises:
             PartitioningError: If distance matrix calculation fails
         """
-        slack_bus = self._select_slack_bus(graph, nodes)
+        selected_slack = self._select_slack_bus(graph, nodes, slack_bus)
 
         # Build susceptance matrix
-        B_matrix, active_nodes = self._build_susceptance_matrix(graph, nodes, slack_bus)
+        B_matrix, active_nodes = self._build_susceptance_matrix(
+            graph, nodes, selected_slack, config
+        )
 
         # Invert susceptance matrix
         B_inv = self._invert_susceptance_matrix(B_matrix)
 
         # Calculate distances
-        distance_matrix_active = self._compute_distances_vectorized(B_inv)
+        distance_matrix_active = self._compute_distances_vectorized(B_inv, config)
 
         # Integrate slack bus
         distance_matrix_full = self._integrate_slack_bus_distances(
-            distance_matrix_active, nodes, slack_bus, active_nodes
+            distance_matrix_active, nodes, selected_slack, active_nodes, config
         )
 
         return distance_matrix_full
 
-    def _select_slack_bus(self, graph: nx.DiGraph, nodes: List[Any]) -> Any:
+    def _select_slack_bus(self, graph: nx.DiGraph, nodes: List[Any],
+                          slack_bus: Optional[Any]) -> Any:
         """
         Select slack bus node.
 
@@ -222,6 +277,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         Args:
             graph: NetworkX DiGraph
             nodes: List of nodes
+            slack_bus: Optional specified slack bus
 
         Returns:
             Selected slack bus node
@@ -229,20 +285,20 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         Raises:
             PartitioningError: If specified slack bus not found
         """
-        if self.slack_bus is not None:
-            if self.slack_bus not in nodes:
+        if slack_bus is not None:
+            if slack_bus not in nodes:
                 raise PartitioningError(
-                    f"Specified slack bus {self.slack_bus} not found in graph.",
+                    f"Specified slack bus {slack_bus} not found in graph.",
                     strategy=self._get_strategy_name()
                 )
-            return self.slack_bus
+            return slack_bus
 
         # Use total degree (in + out) for directed graphs
         degrees = {n: graph.in_degree(n) + graph.out_degree(n) for n in nodes}
         return max(nodes, key=lambda n: degrees[n])
 
     def _build_susceptance_matrix(self, graph: nx.DiGraph, nodes: List[Any],
-                                  slack_bus: Any) -> Tuple[np.ndarray, List[Any]]:
+                                  slack_bus: Any, config: ElectricalDistanceConfig) -> Tuple[np.ndarray, List[Any]]:
         """
         Build the susceptance matrix (B matrix) for the network.
 
@@ -258,6 +314,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             graph: NetworkX DiGraph with reactance on edges
             nodes: Ordered list of all nodes
             slack_bus: Node designated as slack bus
+            config: ElectricalDistanceConfig instance
 
         Returns:
             Tuple of (B_matrix, active_nodes)
@@ -267,7 +324,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         """
         try:
             # Extract edges and susceptances
-            edges, susceptances = self._extract_edge_susceptances(graph)
+            edges, susceptances = self._extract_edge_susceptances(graph, config)
 
             if len(edges) == 0:
                 raise PartitioningError(
@@ -276,14 +333,11 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                 )
 
             # Build incidence matrix (slack-bus-adjusted)
-            K_sba, active_nodes = self._build_incidence_matrix(
-                edges, nodes, slack_bus
-            )
+            K_sba, active_nodes = self._build_incidence_matrix(edges, nodes, slack_bus)
 
             # Determine whether to use sparse matrices
             n_active = len(active_nodes)
-            use_sparse = (self.config.use_sparse and
-                          n_active > self.config.sparse_threshold)
+            use_sparse = config.use_sparse and n_active > config.sparse_threshold
 
             if use_sparse:
                 B_matrix = self._compute_B_matrix_sparse(K_sba, susceptances)
@@ -300,7 +354,8 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                 strategy=self._get_strategy_name()
             ) from e
 
-    def _extract_edge_susceptances(self, graph: nx.DiGraph) -> Tuple[List[Tuple[Any, Any]], np.ndarray]:
+    def _extract_edge_susceptances(self, graph: nx.DiGraph,
+                                   config: ElectricalDistanceConfig) -> Tuple[List[Tuple[Any, Any]], np.ndarray]:
         """
         Extract directed edges and their susceptances from the graph.
 
@@ -308,6 +363,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
         Args:
             graph: NetworkX DiGraph with 'x' (reactance) attribute on edges
+            config: ElectricalDistanceConfig instance
 
         Returns:
             Tuple of (list of (from, to) edges, array of susceptances)
@@ -330,7 +386,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
             if reactance == 0:
                 zero_reactance_count += 1
-                reactance = self.config.zero_reactance_replacement
+                reactance = config.zero_reactance_replacement
 
             edges.append((u, v))
             susceptances.append(1.0 / reactance)
@@ -339,7 +395,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         if zero_reactance_count > 0:
             warnings.warn(
                 f"{zero_reactance_count} edge(s) have zero reactance. "
-                f"Using replacement value: {self.config.zero_reactance_replacement}",
+                f"Using replacement value: {config.zero_reactance_replacement}",
                 UserWarning
             )
 
@@ -475,7 +531,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         # Ensure symmetry
         return (B_inv + B_inv.T) / 2.0
 
-    def _compute_distances_vectorized(self, B_inv: np.ndarray) -> np.ndarray:
+    def _compute_distances_vectorized(self, B_inv: np.ndarray, config: ElectricalDistanceConfig) -> np.ndarray:
         """
         Compute electrical distances using vectorized numpy operations.
 
@@ -486,6 +542,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
         Args:
             B_inv: Impedance matrix (inverted susceptance matrix)
+            config: ElectricalDistanceConfig instance
 
         Returns:
             Distance matrix for active nodes (n_active × n_active)
@@ -504,7 +561,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                             2 * B_inv)
 
         # Handle numerical issues: clamp small negatives to zero
-        significant_negatives = distance_squared < self.config.negative_distance_threshold
+        significant_negatives = distance_squared < config.negative_distance_threshold
 
         if np.any(significant_negatives):
             n_significant = np.sum(significant_negatives)
@@ -523,7 +580,6 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         # Ensure diagonal is exactly zero
         np.fill_diagonal(distance_matrix, 0.0)
 
-        # Validate
         if np.any(np.isnan(distance_matrix)):
             raise PartitioningError(
                 "Distance matrix contains NaN values. This indicates numerical "
@@ -535,7 +591,8 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
     def _integrate_slack_bus_distances(self, distance_matrix_active: np.ndarray,
                                        nodes: List[Any], slack_bus: Any,
-                                       active_nodes: List[Any]) -> np.ndarray:
+                                       active_nodes: List[Any],
+                                       config: ElectricalDistanceConfig) -> np.ndarray:
         """
         Integrate slack bus into the full distance matrix.
 
@@ -546,6 +603,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             nodes: Complete list of all nodes
             slack_bus: Slack bus node
             active_nodes: List of active nodes (excluding slack bus)
+            config: ElectricalDistanceConfig instance
 
         Returns:
             Full distance matrix including slack bus (n_nodes × n_nodes)
@@ -576,7 +634,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             if len(valid_distances) > 0:
                 avg_distance = np.mean(valid_distances)
             else:
-                avg_distance = self.config.slack_distance_fallback
+                avg_distance = config.slack_distance_fallback
                 warnings.warn(
                     f"All electrical distances are zero. "
                     f"Using default distance {avg_distance} for slack bus.",
@@ -596,114 +654,3 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             )
 
         return distance_matrix_full
-
-    def _run_clustering(self, distance_matrix: np.ndarray, **kwargs) -> np.ndarray:
-        """
-        Dispatch to the appropriate clustering algorithm.
-
-        Args:
-            distance_matrix: Precomputed distance matrix
-            **kwargs: Clustering parameters
-
-        Returns:
-            Array of cluster labels
-        """
-        if self.algorithm == 'kmeans':
-            return self._kmeans_clustering(distance_matrix, **kwargs)
-        elif self.algorithm == 'kmedoids':
-            return self._kmedoids_clustering(distance_matrix, **kwargs)
-        else:
-            raise PartitioningError(
-                f"Unknown algorithm: {self.algorithm}",
-                strategy=self._get_strategy_name()
-            )
-
-    @staticmethod
-    def _kmeans_clustering(distance_matrix: np.ndarray, **kwargs) -> np.ndarray:
-        """
-        Perform K-means clustering using electrical distances.
-
-        K-means uses distance matrix rows as feature vectors, clustering
-        nodes based on their distance profiles to all other nodes.
-
-        Args:
-            distance_matrix: Precomputed electrical distance matrix
-            **kwargs: Clustering parameters
-
-        Returns:
-            Cluster labels
-        """
-        try:
-            n_clusters = kwargs.get('n_clusters')
-            random_state = kwargs.get('random_state', 42)
-            max_iter = kwargs.get('max_iter', 300)
-
-            kmeans = KMeans(
-                n_clusters=n_clusters,
-                random_state=random_state,
-                max_iter=max_iter,
-                n_init=10
-            )
-
-            return kmeans.fit_predict(distance_matrix)
-
-        except Exception as e:
-            raise PartitioningError(
-                f"K-means clustering failed: {e}",
-                strategy="electrical_kmeans"
-            ) from e
-
-    @staticmethod
-    def _kmedoids_clustering(distance_matrix: np.ndarray, **kwargs) -> np.ndarray:
-        """
-        Perform K-medoids clustering using precomputed electrical distances.
-
-        K-medoids naturally works with distance matrices and is more robust
-        to outliers than K-means.
-
-        Args:
-            distance_matrix: Precomputed electrical distance matrix
-            **kwargs: Clustering parameters
-
-        Returns:
-            Cluster labels
-        """
-        try:
-            n_clusters = kwargs.get('n_clusters')
-            random_state = kwargs.get('random_state', 42)
-            max_iter = kwargs.get('max_iter', 300)
-
-            kmedoids = KMedoids(
-                n_clusters=n_clusters,
-                metric='precomputed',
-                random_state=random_state,
-                max_iter=max_iter
-            )
-
-            return kmedoids.fit_predict(distance_matrix)
-
-        except Exception as e:
-            raise PartitioningError(
-                f"K-medoids clustering failed: {e}",
-                strategy="electrical_kmedoids"
-            ) from e
-
-    @staticmethod
-    def _create_partition_map(nodes: List[Any], labels: np.ndarray) -> Dict[int, List[Any]]:
-        """Create partition mapping from cluster labels."""
-        from collections import defaultdict
-
-        partition_map: Dict[int, List[Any]] = defaultdict(list)
-        for node, label in zip(nodes, labels):
-            partition_map[int(label)].append(node)
-        return dict(partition_map)
-
-    def _validate_partition(self, partition_map: Dict[int, List[Any]], n_nodes: int) -> None:
-        """Validate that all nodes were assigned to clusters."""
-        total_assigned = sum(len(nodes) for nodes in partition_map.values())
-
-        if total_assigned != n_nodes:
-            raise PartitioningError(
-                f"Partition assignment mismatch: {total_assigned} assigned vs {n_nodes} total",
-                strategy=self._get_strategy_name()
-            )
