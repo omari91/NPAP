@@ -1,7 +1,7 @@
 import networkx as nx
 
-from exceptions import DataLoadingError
-from interfaces import DataLoadingStrategy
+from npap.exceptions import DataLoadingError
+from npap.interfaces import DataLoadingStrategy
 
 
 class NetworkXDirectStrategy(DataLoadingStrategy):
@@ -59,7 +59,6 @@ class NetworkXDirectStrategy(DataLoadingStrategy):
             if isinstance(graph, nx.MultiDiGraph):
                 # Already a MultiDiGraph - create copy
                 print("MULTI-DIGRAPH DETECTED: Input is already a MultiDiGraph.")
-                print("MultiDiGraphs cannot be partitioned directly.")
                 print("Call manager.aggregate_parallel_edges() to collapse parallel edges.")
 
                 result = nx.MultiDiGraph()
@@ -73,7 +72,6 @@ class NetworkXDirectStrategy(DataLoadingStrategy):
             elif isinstance(graph, nx.MultiGraph):
                 # Convert MultiGraph to MultiDiGraph
                 print("MULTI-DIGRAPH DETECTED: Converting MultiGraph to MultiDiGraph.")
-                print("MultiDiGraphs cannot be partitioned directly.")
                 print("Call manager.aggregate_parallel_edges() to collapse parallel edges.")
 
                 result = nx.MultiDiGraph()

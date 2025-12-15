@@ -1,5 +1,5 @@
 """
-Aggregation strategies for network partitioning and aggregation.
+Aggregation strategies for network partitioning and aggregation package.
 
 Separated into:
 - Topology strategies: Define graph structure
@@ -20,7 +20,8 @@ from .basic_strategies import (
     # Edge property strategies
     SumEdgeStrategy,
     AverageEdgeStrategy,
-    FirstEdgeStrategy
+    FirstEdgeStrategy,
+    EquivalentReactanceStrategy
 )
 from .modes import get_mode_profile
 from .physical_strategies import (
@@ -44,6 +45,7 @@ __all__ = [
     'SumEdgeStrategy',
     'AverageEdgeStrategy',
     'FirstEdgeStrategy',
+    'EquivalentReactanceStrategy',
 
     # Mode profiles
     'get_mode_profile',

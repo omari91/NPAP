@@ -35,7 +35,7 @@ def validate_required_attributes(func):
                 node_attrs = graph.nodes[node_id]
                 missing_attrs = required_node_attrs - node_attrs.keys()
                 if missing_attrs:
-                    from exceptions import ValidationError
+                    from npap.exceptions import ValidationError
                     raise ValidationError(
                         f"Node {node_id} missing required attributes",
                         missing_attributes={'nodes': list(missing_attrs)},
@@ -49,7 +49,7 @@ def validate_required_attributes(func):
                 edge_attrs = graph.edges[edge]
                 missing_attrs = required_edge_attrs - edge_attrs.keys()
                 if missing_attrs:
-                    from exceptions import ValidationError
+                    from npap.exceptions import ValidationError
                     raise ValidationError(
                         f"Edge {edge} missing required attributes",
                         missing_attributes={'edges': list(missing_attrs)},
@@ -95,7 +95,7 @@ def validate_graph_compatibility(partition_result, current_graph_hash: str):
         GraphCompatibilityError: If hashes don't match
     """
     if partition_result.original_graph_hash != current_graph_hash:
-        from exceptions import GraphCompatibilityError
+        from npap.exceptions import GraphCompatibilityError
         raise GraphCompatibilityError(
             "Partition was created from a different graph. "
             "Graph structure has changed since partition was created.",
@@ -145,7 +145,7 @@ def resolve_runtime_config(
             **kwargs
         )
     """
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     effective_config = instance_config
 
@@ -258,7 +258,7 @@ def validate_partition(partition_map: Dict[int, List[Any]], n_nodes: int,
     Raises:
         PartitioningError: If node count doesn't match
     """
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     total_assigned = sum(len(nodes) for nodes in partition_map.values())
 
@@ -296,7 +296,7 @@ def run_kmeans(features: np.ndarray, n_clusters: int,
         PartitioningError: If clustering fails
     """
     from sklearn.cluster import KMeans
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     if n_clusters is None or n_clusters <= 0:
         raise PartitioningError("K-Means requires a positive 'n_clusters' parameter.")
@@ -335,7 +335,7 @@ def run_kmedoids(distance_matrix: np.ndarray, n_clusters: int,
         PartitioningError: If clustering fails
     """
     from sklearn_extra.cluster import KMedoids
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     if n_clusters is None or n_clusters <= 0:
         raise PartitioningError("K-Medoids requires a positive 'n_clusters' parameter.")
@@ -373,7 +373,7 @@ def run_hierarchical(distance_matrix: np.ndarray, n_clusters: int,
         PartitioningError: If clustering fails or invalid linkage specified
     """
     from sklearn.cluster import AgglomerativeClustering
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     valid_linkages = {'complete', 'average', 'single'}
     if linkage not in valid_linkages:
@@ -418,7 +418,7 @@ def run_dbscan(distance_matrix: np.ndarray, eps: float,
         PartitioningError: If clustering fails
     """
     from sklearn.cluster import DBSCAN
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     if eps is None or min_samples is None:
         raise PartitioningError("DBSCAN requires 'eps' and 'min_samples' parameters.")
@@ -455,7 +455,7 @@ def run_hdbscan(features: np.ndarray, min_cluster_size: int = 5,
         PartitioningError: If clustering fails
     """
     import hdbscan
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     try:
         clusterer = hdbscan.HDBSCAN(
@@ -519,7 +519,7 @@ def compute_geographical_distances(coordinates: np.ndarray,
     Raises:
         PartitioningError: If unsupported metric specified
     """
-    from exceptions import PartitioningError
+    from npap.exceptions import PartitioningError
 
     if metric == 'euclidean':
         return compute_euclidean_distances(coordinates)

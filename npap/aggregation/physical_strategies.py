@@ -2,7 +2,7 @@ from typing import Dict, List, Any
 
 import networkx as nx
 
-from interfaces import PhysicalAggregationStrategy
+from npap.interfaces import PhysicalAggregationStrategy
 
 
 class KronReductionStrategy(PhysicalAggregationStrategy):

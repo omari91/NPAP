@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import networkx as nx
 
-from utils import validate_required_attributes
+from npap.utils import validate_required_attributes
 
 
 class EdgeType(Enum):

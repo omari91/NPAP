@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
 
-from interfaces import (
+from npap.interfaces import (
     DataLoadingStrategy, PartitioningStrategy, AggregationProfile, AggregationMode,
     TopologyStrategy, PhysicalAggregationStrategy,
     NodePropertyStrategy, EdgePropertyStrategy, PartitionResult
@@ -33,9 +33,9 @@ class InputDataManager:
 
     def _register_default_strategies(self):
         """Register built-in loading strategies"""
-        from input.csv_loader import CSVFilesStrategy
-        from input.networkx_loader import NetworkXDirectStrategy
-        from input.va_loader import VoltageAwareStrategy
+        from npap.input.csv_loader import CSVFilesStrategy
+        from npap.input.networkx_loader import NetworkXDirectStrategy
+        from npap.input.va_loader import VoltageAwareStrategy
 
         self._strategies['csv_files'] = CSVFilesStrategy()
         self._strategies['networkx_direct'] = NetworkXDirectStrategy()
@@ -63,10 +63,10 @@ class PartitioningManager:
 
     def _register_default_strategies(self):
         """Register built-in partitioning strategies"""
-        from partitioning.geographical import GeographicalPartitioning
-        from partitioning.electrical import ElectricalDistancePartitioning
-        from partitioning.va_geographical import VAGeographicalPartitioning
-        from partitioning.va_geographical import VAGeographicalConfig
+        from npap.partitioning.geographical import GeographicalPartitioning
+        from npap.partitioning.electrical import ElectricalDistancePartitioning
+        from npap.partitioning.va_geographical import VAGeographicalPartitioning
+        from npap.partitioning.va_geographical import VAGeographicalConfig
 
         # Geographical distance partitioning strategies
         self._strategies['geographical_kmeans'] = GeographicalPartitioning(
@@ -193,7 +193,7 @@ class AggregationManager:
         Returns:
             AggregationProfile configured for the mode
         """
-        from aggregation.modes import get_mode_profile
+        from npap.aggregation.modes import get_mode_profile
         return get_mode_profile(mode, **overrides)
 
     def aggregate(self, graph: nx.DiGraph, partition_map: Dict[int, List[Any]],
@@ -283,7 +283,7 @@ class AggregationManager:
             ValueError: If graph is not a MultiDiGraph
             AggregationError: If aggregation fails
         """
-        from exceptions import AggregationError
+        from npap.exceptions import AggregationError
 
         # Validate input
         if not isinstance(graph, nx.MultiDiGraph):
@@ -472,7 +472,7 @@ class AggregationManager:
                         node_attrs[prop] = strategy.aggregate_property(graph, nodes, prop)
                     else:
                         # Fallback to first value
-                        node_attrs[prop] = graph.nodes[nodes[0]].get(prop)
+                        node_attrs[prop] = graph.nodes[nodes[0]].get(prop)  # TODO: handle empty nodes list?
 
             # Update node attributes
             aggregated.nodes[cluster_id].update(node_attrs)
@@ -536,12 +536,12 @@ class AggregationManager:
 
     def _register_default_strategies(self):
         """Register built-in aggregation strategies"""
-        from aggregation.basic_strategies import (
+        from npap.aggregation.basic_strategies import (
             SimpleTopologyStrategy, ElectricalTopologyStrategy,
             SumNodeStrategy, AverageNodeStrategy, FirstNodeStrategy,
             SumEdgeStrategy, AverageEdgeStrategy, FirstEdgeStrategy, EquivalentReactanceStrategy
         )
-        from aggregation.physical_strategies import (
+        from npap.aggregation.physical_strategies import (
             KronReductionStrategy
         )
 
@@ -633,7 +633,7 @@ class PartitionAggregatorManager:
             )
 
         # Validate partition compatibility
-        from utils import validate_graph_compatibility
+        from npap.utils import validate_graph_compatibility
         validate_graph_compatibility(partition_to_use, self._current_graph_hash)
 
         # Determine profile to use
@@ -763,7 +763,7 @@ class PartitionAggregatorManager:
     @staticmethod
     def _compute_graph_hash(graph: nx.DiGraph) -> str:
         """Compute hash for graph validation"""
-        from utils import compute_graph_hash
+        from npap.utils import compute_graph_hash
         return compute_graph_hash(graph)
 
     def plot_network(self, style: str = 'simple', graph: nx.DiGraph = None,
@@ -802,7 +802,7 @@ class PartitionAggregatorManager:
         Returns:
             Plotly Figure object
         """
-        from visualization import plot_network
+        from npap.visualization import plot_network
 
         target_graph = graph if graph is not None else self._current_graph
         if target_graph is None:

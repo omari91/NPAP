@@ -10,18 +10,18 @@ __version__ = "0.1.0"
 __author__ = "Marco Antonio Arnaiz Montero"
 
 # Core components
-from .managers import PartitionAggregatorManager
-from .interfaces import (
+from npap.managers import PartitionAggregatorManager
+from npap.interfaces import (
     AggregationProfile,
     AggregationMode,
     PartitionResult
 )
 
 # Aggregation mode helper
-from .aggregation.modes import get_mode_profile
+from npap.aggregation import get_mode_profile
 
 # Exceptions
-from .exceptions import (
+from npap.exceptions import (
     NPAPError,
     DataLoadingError,
     PartitioningError,
@@ -53,3 +53,8 @@ __all__ = [
 def get_version():
     """Get package version"""
     return __version__
+
+
+def get_author():
+    """Get package author"""
+    return __author__

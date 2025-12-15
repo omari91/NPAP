@@ -3,8 +3,8 @@ from typing import Dict, List, Any
 
 import networkx as nx
 
-from exceptions import AggregationError
-from interfaces import (
+from npap.exceptions import AggregationError
+from npap.interfaces import (
     TopologyStrategy, NodePropertyStrategy, EdgePropertyStrategy
 )
 

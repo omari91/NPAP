@@ -6,7 +6,7 @@ import networkx as nx
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from interfaces import EdgeType
+from npap.interfaces import EdgeType
 
 
 class PlotStyle(Enum):

@@ -5,8 +5,8 @@ import networkx as nx
 import pandas as pd
 from networkx import DiGraph, MultiDiGraph
 
-from exceptions import DataLoadingError
-from interfaces import DataLoadingStrategy, EdgeType
+from npap.exceptions import DataLoadingError
+from npap.interfaces import DataLoadingStrategy, EdgeType
 
 
 class VoltageAwareStrategy(DataLoadingStrategy):
@@ -174,7 +174,6 @@ class VoltageAwareStrategy(DataLoadingStrategy):
             if has_parallel_edges:
                 graph = nx.MultiDiGraph()
                 print("MULTI-DIGRAPH DETECTED: Parallel edges found in the data.")
-                print("MultiDiGraphs cannot be partitioned directly.")
                 print("Call manager.aggregate_parallel_edges() to collapse parallel edges.")
             else:
                 graph = nx.DiGraph()

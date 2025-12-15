@@ -4,9 +4,9 @@ from typing import Dict, List, Any, Optional, Tuple
 import networkx as nx
 import numpy as np
 
-from exceptions import PartitioningError
-from interfaces import PartitioningStrategy
-from utils import (
+from npap.exceptions import PartitioningError
+from npap.interfaces import PartitioningStrategy
+from npap.utils import (
     with_runtime_config,
     create_partition_map, validate_partition,
     run_kmedoids, run_hierarchical,
