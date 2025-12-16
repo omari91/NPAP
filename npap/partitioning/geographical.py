@@ -10,7 +10,7 @@ from npap.utils import (
     with_runtime_config,
     create_partition_map, validate_partition,
     run_kmeans, run_kmedoids, run_hierarchical, run_dbscan, run_hdbscan,
-    compute_geographical_distances
+    compute_geographical_distances, validate_required_attributes
 )
 
 
@@ -108,6 +108,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         return f"geographical_{self.algorithm}"
 
     @with_runtime_config(GeographicalConfig, _CONFIG_PARAMS)
+    @validate_required_attributes
     def partition(self, graph: nx.Graph, **kwargs) -> Dict[int, List[Any]]:
         """
         Partition nodes based on geographical coordinates.

@@ -10,7 +10,7 @@ from npap.utils import (
     with_runtime_config,
     create_partition_map, validate_partition,
     run_kmedoids, run_hierarchical,
-    compute_geographical_distances
+    compute_geographical_distances, validate_required_attributes
 )
 
 
@@ -154,6 +154,7 @@ class VAGeographicalPartitioning(PartitioningStrategy):
         return f"va_geographical_{mode}_{self.algorithm}"
 
     @with_runtime_config(VAGeographicalConfig, _CONFIG_PARAMS)
+    @validate_required_attributes
     def partition(self, graph: nx.Graph, **kwargs) -> Dict[int, List[Any]]:
         """
         Partition nodes based on DC island and voltage-aware geographical distance.

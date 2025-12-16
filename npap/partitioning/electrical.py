@@ -11,7 +11,7 @@ from npap.interfaces import PartitioningStrategy
 from npap.utils import (
     with_runtime_config,
     create_partition_map, validate_partition,
-    run_kmeans, run_kmedoids
+    run_kmeans, run_kmedoids, validate_required_attributes
 )
 
 
@@ -108,6 +108,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         return f"electrical_{self.algorithm}"
 
     @with_runtime_config(ElectricalDistanceConfig, _CONFIG_PARAMS)
+    @validate_required_attributes
     def partition(self, graph: nx.DiGraph, **kwargs) -> Dict[int, List[Any]]:
         """
         Partition nodes based on electrical distance.
