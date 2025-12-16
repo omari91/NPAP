@@ -190,7 +190,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             # K-means uses distance matrix rows as feature vectors
             return run_kmeans(distance_matrix, n_clusters, random_state, max_iter)
         elif self.algorithm == 'kmedoids':
-            return run_kmedoids(distance_matrix, n_clusters, random_state, max_iter)
+            return run_kmedoids(distance_matrix, n_clusters)
         else:
             raise PartitioningError(
                 f"Unknown algorithm: {self.algorithm}",

@@ -184,7 +184,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         if self.algorithm == 'kmeans':
             return self._kmeans_clustering(coordinates, config, **kwargs)
         elif self.algorithm == 'kmedoids':
-            return self._kmedoids_clustering(coordinates, config, **kwargs)
+            return self._kmedoids_clustering(coordinates, **kwargs)
         elif self.algorithm == 'dbscan':
             return self._dbscan_clustering(coordinates, **kwargs)
         elif self.algorithm == 'hierarchical':
@@ -225,7 +225,6 @@ class GeographicalPartitioning(PartitioningStrategy):
         )
 
     def _kmedoids_clustering(self, coordinates: np.ndarray,
-                             config: GeographicalConfig,
                              **kwargs) -> np.ndarray:
         """Perform K-medoids clustering on geographical coordinates."""
         n_clusters = kwargs.get('n_clusters')
@@ -238,12 +237,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         # Calculate distance matrix using utility function
         distance_matrix = compute_geographical_distances(coordinates, self.distance_metric)
 
-        return run_kmedoids(
-            distance_matrix,
-            n_clusters,
-            config.random_state,
-            config.max_iter
-        )
+        return run_kmedoids(distance_matrix, n_clusters)
 
     def _dbscan_clustering(self, coordinates: np.ndarray, **kwargs) -> np.ndarray:
         """Perform DBSCAN clustering on geographical coordinates."""

@@ -314,8 +314,7 @@ def run_kmeans(features: np.ndarray, n_clusters: int,
         raise PartitioningError(f"K-Means clustering failed: {e}") from e
 
 
-def run_kmedoids(distance_matrix: np.ndarray, n_clusters: int,
-                 random_state: int = 42, max_iter: int = 300) -> np.ndarray:
+def run_kmedoids(distance_matrix: np.ndarray, n_clusters: int) -> np.ndarray:
     """
     Perform K-Medoids clustering with precomputed distance matrix.
 
@@ -325,8 +324,6 @@ def run_kmedoids(distance_matrix: np.ndarray, n_clusters: int,
     Args:
         distance_matrix: Precomputed distance matrix (n × n), must be symmetric
         n_clusters: Number of clusters to form
-        random_state: Random seed for reproducibility
-        max_iter: Maximum iterations for convergence
 
     Returns:
         Array of cluster labels for each sample
@@ -334,20 +331,15 @@ def run_kmedoids(distance_matrix: np.ndarray, n_clusters: int,
     Raises:
         PartitioningError: If clustering fails
     """
-    from sklearn_extra.cluster import KMedoids
+    import kmedoids
     from npap.exceptions import PartitioningError
 
     if n_clusters is None or n_clusters <= 0:
         raise PartitioningError("K-Medoids requires a positive 'n_clusters' parameter.")
 
     try:
-        kmedoids = KMedoids(
-            n_clusters=n_clusters,
-            metric='precomputed',
-            random_state=random_state,
-            max_iter=max_iter
-        )
-        return kmedoids.fit_predict(distance_matrix)
+        result = kmedoids.fasterpam(distance_matrix, n_clusters)
+        return result.labels
 
     except Exception as e:
         raise PartitioningError(f"K-Medoids clustering failed: {e}") from e

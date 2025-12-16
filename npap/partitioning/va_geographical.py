@@ -346,11 +346,9 @@ class VAGeographicalPartitioning(PartitioningStrategy):
                         **kwargs) -> np.ndarray:
         """Dispatch to appropriate clustering algorithm using utility functions."""
         n_clusters = kwargs.get('n_clusters')
-        random_state = kwargs.get('random_state', 42)
-        max_iter = kwargs.get('max_iter', 300)
 
         if self.algorithm == 'kmedoids':
-            return run_kmedoids(distance_matrix, n_clusters, random_state, max_iter)
+            return run_kmedoids(distance_matrix, n_clusters)
         elif self.algorithm == 'hierarchical':
             return run_hierarchical(distance_matrix, n_clusters, config.hierarchical_linkage)
         else:
