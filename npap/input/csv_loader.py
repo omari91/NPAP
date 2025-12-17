@@ -36,8 +36,8 @@ class CSVFilesStrategy(DataLoadingStrategy):
     def load(self, node_file: str, edge_file: str, **kwargs) -> nx.DiGraph | nx.MultiDiGraph:
         """Load graph from CSV files as a directed graph."""
         try:
-            delimiter = kwargs["delimiter"] if 'delimiter' in kwargs else ','
-            decimal = kwargs["decimal"] if 'decimal' in kwargs else '.'
+            delimiter = kwargs.get("delimiter", ',')
+            decimal = kwargs.get("decimal", '.')
 
             # Load nodes
             nodes_df = pd.read_csv(node_file, delimiter=delimiter, decimal=decimal)
