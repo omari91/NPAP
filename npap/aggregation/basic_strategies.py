@@ -15,7 +15,7 @@ from npap.interfaces import (
 
 class SimpleTopologyStrategy(TopologyStrategy):
     """
-    Simple topology: one node per cluster, edges only where original connections exist
+    Simple topology: one node per cluster, edges only where original connections exist.
 
     This is the most basic topology strategy:
     - Creates one node per cluster
@@ -27,7 +27,7 @@ class SimpleTopologyStrategy(TopologyStrategy):
 
     def create_topology(self, graph: nx.DiGraph,
                         partition_map: Dict[int, List[Any]]) -> nx.DiGraph:
-        """Create aggregated topology with basic node and edge mapping"""
+        """Create aggregated topology with basic node and edge mapping."""
         try:
             aggregated = nx.DiGraph()
 
@@ -48,14 +48,14 @@ class SimpleTopologyStrategy(TopologyStrategy):
 
     @property
     def can_create_new_edges(self) -> bool:
-        """Simple topology does not create new edges"""
+        """Simple topology does not create new edges."""
         return False
 
 
 class ElectricalTopologyStrategy(TopologyStrategy):
     """
     Electrical topology: may create fully connected or partially connected topology
-    for subsequent physical aggregation (e.g., Kron reduction)
+    for subsequent physical aggregation (e.g., Kron reduction).
 
     This topology strategy is designed for electrical networks where:
     - Physical coupling may exist even without direct edges
@@ -65,19 +65,18 @@ class ElectricalTopologyStrategy(TopologyStrategy):
 
     def __init__(self, initial_connectivity: str = "existing"):
         """
-        Initialize electrical topology strategy
+        Initialize electrical topology strategy.
 
         Args:
             initial_connectivity: How to initialize edges
                 - "existing": Only edges where original connections exist (like simple)
                 - "full": Fully connected (all cluster pairs connected)
-                - "threshold": Based on electrical distance threshold (TODO)
         """
         self.initial_connectivity = initial_connectivity
 
     def create_topology(self, graph: nx.DiGraph,
                         partition_map: Dict[int, List[Any]]) -> nx.DiGraph:
-        """Create topology suitable for electrical aggregation"""
+        """Create topology suitable for electrical aggregation."""
         try:
             aggregated = nx.DiGraph()
 
@@ -87,7 +86,6 @@ class ElectricalTopologyStrategy(TopologyStrategy):
 
             # Step 2: Create edges based on connectivity mode
             if self.initial_connectivity == "full":
-                # Create fully connected directed graph (both directions)
                 for cluster1, cluster2 in itertools.permutations(partition_map.keys(), 2):
                     aggregated.add_edge(cluster1, cluster2)
 
@@ -145,10 +143,10 @@ def _create_edges_with_existing_connection(partition_map: Dict[int, List[Any]],
 # ============================================================================
 
 class SumNodeStrategy(NodePropertyStrategy):
-    """Sum numerical properties across nodes in a cluster"""
+    """Sum numerical properties across nodes in a cluster."""
 
     def aggregate_property(self, graph: nx.DiGraph, nodes: List[Any], property_name: str) -> Any:
-        """Sum property values across nodes"""
+        """Sum property values across nodes."""
         try:
             values = []
             for node in nodes:
@@ -166,10 +164,10 @@ class SumNodeStrategy(NodePropertyStrategy):
 
 
 class AverageNodeStrategy(NodePropertyStrategy):
-    """Average numerical properties across nodes in a cluster"""
+    """Average numerical properties across nodes in a cluster."""
 
     def aggregate_property(self, graph: nx.DiGraph, nodes: List[Any], property_name: str) -> Any:
-        """Average property values across nodes"""
+        """Average property values across nodes."""
         try:
             values = []
             for node in nodes:
@@ -187,10 +185,10 @@ class AverageNodeStrategy(NodePropertyStrategy):
 
 
 class FirstNodeStrategy(NodePropertyStrategy):
-    """Take the first available value for non-numerical properties"""
+    """Take the first available value for non-numerical properties."""
 
     def aggregate_property(self, graph: nx.DiGraph, nodes: List[Any], property_name: str) -> Any:
-        """Take first available property value"""
+        """Take first available property value."""
         try:
             for node in nodes:
                 if property_name in graph.nodes[node]:
@@ -208,10 +206,10 @@ class FirstNodeStrategy(NodePropertyStrategy):
 # ============================================================================
 
 class SumEdgeStrategy(EdgePropertyStrategy):
-    """Sum numerical properties across edges"""
+    """Sum numerical properties across edges."""
 
     def aggregate_property(self, original_edges: List[Dict[str, Any]], property_name: str) -> Any:
-        """Sum property values across edges"""
+        """Sum property values across edges."""
         try:
             values = []
             for edge_data in original_edges:
@@ -229,10 +227,10 @@ class SumEdgeStrategy(EdgePropertyStrategy):
 
 
 class AverageEdgeStrategy(EdgePropertyStrategy):
-    """Average numerical properties across edges"""
+    """Average numerical properties across edges."""
 
     def aggregate_property(self, original_edges: List[Dict[str, Any]], property_name: str) -> Any:
-        """Average property values across edges"""
+        """Average property values across edges."""
         try:
             values = []
             for edge_data in original_edges:
@@ -250,10 +248,10 @@ class AverageEdgeStrategy(EdgePropertyStrategy):
 
 
 class FirstEdgeStrategy(EdgePropertyStrategy):
-    """Take the first available value for non-numerical properties"""
+    """Take the first available value for non-numerical properties."""
 
     def aggregate_property(self, original_edges: List[Dict[str, Any]], property_name: str) -> Any:
-        """Take first available property value"""
+        """Take first available property value."""
         try:
             for edge_data in original_edges:
                 if property_name in edge_data:
