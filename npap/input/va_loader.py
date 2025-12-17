@@ -7,6 +7,7 @@ from networkx import DiGraph, MultiDiGraph
 
 from npap.exceptions import DataLoadingError
 from npap.interfaces import DataLoadingStrategy, EdgeType
+from npap.logging import log_debug, log_info, log_warning, LogCategory
 
 
 class VoltageAwareStrategy(DataLoadingStrategy):
@@ -78,6 +79,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
                     details={'missing_file': str(file_path)}
                 )
 
+        log_debug(f"Validated VA loader input files", LogCategory.INPUT)
         return True
 
     def load(self, node_file: str, line_file: str, transformer_file: str,
@@ -114,6 +116,8 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         try:
             delimiter = kwargs.get('delimiter', ',')
             decimal = kwargs.get('decimal', '.')
+
+            log_debug(f"Loading nodes from {node_file}", LogCategory.INPUT)
 
             # Load and validate nodes
             nodes_df = self._load_nodes(node_file, delimiter, decimal)
@@ -172,8 +176,11 @@ class VoltageAwareStrategy(DataLoadingStrategy):
             # Create appropriate graph type
             if has_parallel_edges:
                 graph = nx.MultiDiGraph()
-                print("MULTI-DIGRAPH DETECTED: Parallel edges found in the data.")
-                print("Call manager.aggregate_parallel_edges() to collapse parallel edges.")
+                log_warning(
+                    "Parallel edges detected in voltage-aware loader. A MultiDiGraph will be created. "
+                    "Call manager.aggregate_parallel_edges() to collapse parallel edges before partitioning.",
+                    LogCategory.INPUT
+                )
             else:
                 graph = nx.DiGraph()
 
@@ -187,8 +194,11 @@ class VoltageAwareStrategy(DataLoadingStrategy):
             n_lines = len(line_tuples)
             n_trafos = len(transformer_tuples)
             n_dc_links = len(dc_link_tuples)
-            print(f"\nLoaded network: {graph.number_of_nodes()} nodes, "
-                  f"{n_lines} lines, {n_trafos} transformers, {n_dc_links} DC links")
+            log_info(
+                f"Loaded VA network: {graph.number_of_nodes()} nodes, "
+                f"{n_lines} lines, {n_trafos} transformers, {n_dc_links} DC links",
+                LogCategory.INPUT
+            )
 
             # Verify final graph connectivity
             self._verify_final_connectivity(graph)
@@ -268,7 +278,11 @@ class VoltageAwareStrategy(DataLoadingStrategy):
             island_counts[island_id] = island_counts.get(island_id, 0) + 1
 
         n_islands = len(island_counts)
-        print(f"Found {n_islands} DC island(s)")
+        log_info(f"Detected {n_islands} DC island(s)", LogCategory.INPUT)
+
+        if n_islands > 1:
+            for island_id, count in sorted(island_counts.items()):
+                log_debug(f"  DC Island {island_id}: {count} nodes", LogCategory.INPUT)
 
     # =========================================================================
     # Isolated Node Removal Methods
@@ -280,8 +294,12 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         isolated_nodes = list(nx.isolates(graph))
 
         if isolated_nodes:
-            print(f"\nWARNING: Found {len(isolated_nodes)} isolated node(s) with no connections.")
-            print("These nodes will be removed from the graph.")
+            log_warning(
+                f"Found {len(isolated_nodes)} isolated node(s) with no connections. These will be removed.",
+                LogCategory.INPUT
+            )
+            log_debug(f"Removed isolated nodes: {isolated_nodes[:10]}{'...' if len(isolated_nodes) > 10 else ''}",
+                      LogCategory.INPUT)
             graph.remove_nodes_from(isolated_nodes)
         return graph
 
@@ -292,18 +310,20 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         n_components = nx.number_connected_components(undirected)
 
         if n_components == 1:
-            print("Final graph is fully connected (single component)")
+            log_info("Final graph is fully connected (single component)", LogCategory.INPUT)
         else:
-            print(f"Final graph has {n_components} disconnected component(s)")
-            print("This may indicate missing DC links or data issues.")
+            log_warning(
+                f"Final graph has {n_components} disconnected component(s). "
+                "This may indicate missing DC links or data issues.",
+                LogCategory.INPUT,
+                warn_user=False
+            )
 
-            # Show component sizes
-            components = sorted(nx.connected_components(undirected),
-                                key=len, reverse=True)
+            components = sorted(nx.connected_components(undirected), key=len, reverse=True)
             for i, comp in enumerate(components[:5]):
-                print(f"  • Component {i}: {len(comp)} node(s)")
+                log_debug(f"  Component {i}: {len(comp)} node(s)", LogCategory.INPUT)
             if len(components) > 5:
-                print(f"  ... and {len(components) - 5} more component(s)")
+                log_debug(f"  ... and {len(components) - 5} more component(s)", LogCategory.INPUT)
 
     # =========================================================================
     # File Loading Methods
@@ -324,7 +344,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         lines_df = pd.read_csv(file_path, delimiter=delimiter, decimal=decimal, quotechar="'")
 
         if lines_df.empty:
-            print("Warning: Lines file is empty. Proceeding with other edge types.")
+            log_warning("Lines file is empty. Proceeding with other edge types.", LogCategory.INPUT)
             return pd.DataFrame(columns=self.REQUIRED_LINE_COLUMNS)
 
         missing_cols = [col for col in self.REQUIRED_LINE_COLUMNS if col not in lines_df.columns]
@@ -342,7 +362,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         transformers_df = pd.read_csv(file_path, delimiter=delimiter, decimal=decimal, quotechar="'")
 
         if transformers_df.empty:
-            print("Warning: Transformers file is empty. Proceeding with other edge types.")
+            log_warning("Transformers file is empty. Proceeding with other edge types.", LogCategory.INPUT)
             return pd.DataFrame(columns=self.REQUIRED_TRANSFORMER_COLUMNS)
 
         missing_cols = [col for col in self.REQUIRED_TRANSFORMER_COLUMNS
@@ -383,7 +403,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         converters_df = pd.read_csv(file_path, delimiter=delimiter, decimal=decimal, quotechar="'")
 
         if converters_df.empty:
-            print("Warning: Converters file is empty. No DC links will be created.")
+            log_warning("Converters file is empty. No DC links will be created.", LogCategory.INPUT)
             return pd.DataFrame(columns=self.REQUIRED_CONVERTER_COLUMNS)
 
         missing_cols = [col for col in self.REQUIRED_CONVERTER_COLUMNS
@@ -402,7 +422,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         links_df = pd.read_csv(file_path, delimiter=delimiter, decimal=decimal, quotechar="'")
 
         if links_df.empty:
-            print("Warning: Links file is empty. No DC links will be created.")
+            log_warning("Links file is empty. No DC links will be created.", LogCategory.INPUT)
             return pd.DataFrame(columns=self.REQUIRED_LINK_COLUMNS)
 
         missing_cols = [col for col in self.REQUIRED_LINK_COLUMNS
@@ -578,11 +598,14 @@ class VoltageAwareStrategy(DataLoadingStrategy):
 
         # Report skipped links
         if skipped_links:
-            print(f"Warning: {len(skipped_links)} DC links skipped due to missing references:")
-            for link_id, reason in skipped_links[:5]:  # Show first 5
-                print(f"  - {link_id}: {reason}")
+            log_warning(
+                f"{len(skipped_links)} DC link(s) skipped due to missing references",
+                LogCategory.INPUT
+            )
+            for link_id, reason in skipped_links[:5]:
+                log_debug(f"  - {link_id}: {reason}", LogCategory.INPUT)
             if len(skipped_links) > 5:
-                print(f"  ... and {len(skipped_links) - 5} more")
+                log_debug(f"  ... and {len(skipped_links) - 5} more", LogCategory.INPUT)
 
         return edge_tuples
 
