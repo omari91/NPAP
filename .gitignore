@@ -18,5 +18,6 @@ npap.egg-info
 /dist
 
 # Coverage files
+test/coverage_annotated
 test/htmlcov
 .coverage
