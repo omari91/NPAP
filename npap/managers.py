@@ -1,4 +1,3 @@
-import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
@@ -8,6 +7,7 @@ from npap.interfaces import (
     TopologyStrategy, PhysicalAggregationStrategy,
     NodePropertyStrategy, EdgePropertyStrategy, PartitionResult
 )
+from npap.logging import log_debug, log_info, log_warning, LogCategory
 
 
 class InputDataManager:
@@ -20,6 +20,7 @@ class InputDataManager:
     def register_strategy(self, name: str, strategy: DataLoadingStrategy) -> None:
         """Register a new data loading strategy."""
         self._strategies[name] = strategy
+        log_debug(f"Registered input strategy: {name}", LogCategory.MANAGER)
 
     def load(self, strategy_name: str, **kwargs) -> nx.DiGraph | nx.MultiDiGraph:
         """Load data using specified strategy."""
@@ -27,6 +28,7 @@ class InputDataManager:
             available = ', '.join(self._strategies.keys())
             raise ValueError(f"Unknown data loading strategy: {strategy_name}. Available: {available}")
 
+        log_info(f"Loading data with strategy: {strategy_name}", LogCategory.INPUT)
         strategy = self._strategies[strategy_name]
         strategy.validate_inputs(**kwargs)
         return strategy.load(**kwargs)
@@ -40,6 +42,7 @@ class InputDataManager:
         self._strategies['csv_files'] = CSVFilesStrategy()
         self._strategies['networkx_direct'] = NetworkXDirectStrategy()
         self._strategies['va_loader'] = VoltageAwareStrategy()
+        log_debug("Registered default input strategies", LogCategory.MANAGER)
 
 
 class PartitioningManager:
@@ -52,6 +55,7 @@ class PartitioningManager:
     def register_strategy(self, name: str, strategy: PartitioningStrategy) -> None:
         """Register a new partitioning strategy."""
         self._strategies[name] = strategy
+        log_debug(f"Registered partitioning strategy: {name}", LogCategory.MANAGER)
 
     def partition(self, graph: nx.DiGraph, method: str, **kwargs) -> Dict[int, List[Any]]:
         """Execute partitioning using specified strategy."""
@@ -59,6 +63,7 @@ class PartitioningManager:
             available = ', '.join(self._strategies.keys())
             raise ValueError(f"Unknown partitioning strategy: {method}. Available: {available}")
 
+        log_info(f"Partitioning graph with strategy: {method}", LogCategory.PARTITIONING)
         return self._strategies[method].partition(graph, **kwargs)
 
     def _register_default_strategies(self) -> None:
@@ -141,6 +146,8 @@ class PartitioningManager:
             config=VAGeographicalConfig(proportional_clustering=True)
         )
 
+        log_debug("Registered default partitioning strategies", LogCategory.MANAGER)
+
 
 class AggregationManager:
     """
@@ -168,17 +175,19 @@ class AggregationManager:
     def register_topology_strategy(self, name: str, strategy: TopologyStrategy) -> None:
         """Register a topology strategy."""
         self._topology_strategies[name] = strategy
+        log_debug(f"Registered topology strategy: {name}", LogCategory.MANAGER)
 
     def register_physical_strategy(self, name: str, strategy: PhysicalAggregationStrategy) -> None:
         """Register a physical aggregation strategy."""
         self._physical_strategies[name] = strategy
+        log_debug(f"Registered physical strategy: {name}", LogCategory.MANAGER)
 
     def register_node_strategy(self, name: str, strategy: NodePropertyStrategy) -> None:
         """Register a node property aggregation strategy."""
         self._node_strategies[name] = strategy
 
     def register_edge_strategy(self, name: str, strategy: EdgePropertyStrategy) -> None:
-        """Register an edge property aggregation strategy"""
+        """Register an edge property aggregation strategy."""
         self._edge_strategies[name] = strategy
 
     @staticmethod
@@ -209,12 +218,23 @@ class AggregationManager:
         if profile is None:
             profile = AggregationProfile()
 
+        log_info(
+            f"Aggregating graph: {len(partition_map)} clusters, "
+            f"topology={profile.topology_strategy}",
+            LogCategory.AGGREGATION
+        )
+
         # Validate strategies exist
         self._validate_profile(profile)
 
         # Step 1: Create topology
         topology_strategy = self._topology_strategies[profile.topology_strategy]
         aggregated = topology_strategy.create_topology(graph, partition_map)
+        log_info(
+            f"Created topology: {aggregated.number_of_nodes()} nodes, "
+            f"{aggregated.number_of_edges()} edges",
+            LogCategory.AGGREGATION
+        )
 
         # Track which properties are handled by physical aggregation
         physical_modified_properties = set()
@@ -225,11 +245,10 @@ class AggregationManager:
 
             # Validate topology compatibility
             if topology_strategy.__class__.__name__ != physical_strategy.required_topology:
-                warnings.warn(
-                    f"Physical strategy '{profile.physical_strategy}' recommends "
-                    f"'{physical_strategy.required_topology}' topology, "
-                    f"but '{profile.topology_strategy}' is being used. "
-                    f"Results may be incorrect."
+                log_warning(
+                    f"Physical strategy '{profile.physical_strategy}' recommends '{physical_strategy.required_topology}' topology, "
+                    f"but '{profile.topology_strategy}' is being used. Results may be incorrect.",
+                    LogCategory.AGGREGATION
                 )
 
             # Apply physical aggregation
@@ -253,6 +272,12 @@ class AggregationManager:
         # Step 4: Aggregate edge properties
         self._aggregate_edge_properties(
             graph, partition_map, aggregated, profile, physical_modified_properties
+        )
+
+        log_info(
+            f"Aggregation complete: {aggregated.number_of_nodes()} nodes, "
+            f"{aggregated.number_of_edges()} edges",
+            LogCategory.AGGREGATION
         )
 
         return aggregated
@@ -292,6 +317,11 @@ class AggregationManager:
                 "This method is only for collapsing parallel edges in directed multigraphs."
             )
 
+        log_info(
+            f"Aggregating parallel edges in MultiDiGraph with {graph.number_of_edges()} edges",
+            LogCategory.AGGREGATION
+        )
+
         edge_properties = edge_properties or {}
 
         # Validate strategies exist
@@ -324,6 +354,7 @@ class AggregationManager:
 
             # Process each unique directed edge (u->v pair)
             processed_edges = set()
+            parallel_count = 0
 
             for u, v in graph.edges():
                 edge_key = (u, v)
@@ -335,6 +366,9 @@ class AggregationManager:
                 parallel_edges_data = []
                 for key in graph[u][v]:
                     parallel_edges_data.append(graph[u][v][key])
+
+                if len(parallel_edges_data) > 1:
+                    parallel_count += 1
 
                 # Aggregate properties
                 aggregated_attrs = {}
@@ -349,9 +383,9 @@ class AggregationManager:
                         )
                     else:
                         if warn_on_defaults and prop not in warned_properties:
-                            warnings.warn(
-                                f"Edge property '{prop}' not specified. "
-                                f"Using default strategy '{default_strategy}'"
+                            log_warning(
+                                f"Edge property '{prop}' not specified. Using default strategy '{default_strategy}'",
+                                LogCategory.AGGREGATION
                             )
                             warned_properties.add(prop)
                         strategy = self._edge_strategies[default_strategy]
@@ -360,6 +394,11 @@ class AggregationManager:
                         )
 
                 simple_graph.add_edge(u, v, **aggregated_attrs)
+
+            log_info(
+                f"Parallel edge aggregation complete: {parallel_count} parallel edge groups collapsed",
+                LogCategory.AGGREGATION
+            )
 
             return simple_graph
 
@@ -408,20 +447,18 @@ class AggregationManager:
         """Check if user tried to override properties handled by physical strategy."""
         for prop in profile.node_properties:
             if prop in physical_properties:
-                warnings.warn(
+                log_warning(
                     f"Node property '{prop}' is modified by physical strategy "
-                    f"'{profile.physical_strategy}'. Your statistical aggregation "
-                    f"for this property will be IGNORED.",
-                    UserWarning
+                    f"'{profile.physical_strategy}'. User statistical aggregation for this property will be IGNORED.",
+                    LogCategory.AGGREGATION
                 )
 
         for prop in profile.edge_properties:
             if prop in physical_properties:
-                warnings.warn(
+                log_warning(
                     f"Edge property '{prop}' is modified by physical strategy "
-                    f"'{profile.physical_strategy}'. Your statistical aggregation "
-                    f"for this property will be IGNORED.",
-                    UserWarning
+                    f"'{profile.physical_strategy}'. User statistical aggregation for this property will be IGNORED.",
+                    LogCategory.AGGREGATION
                 )
 
     def _aggregate_node_properties(self, graph: nx.DiGraph, partition_map: Dict[int, List[Any]],
@@ -452,9 +489,9 @@ class AggregationManager:
                 else:
                     # Use default strategy with optional warning
                     if profile.warn_on_defaults:
-                        warnings.warn(
-                            f"Node property '{prop}' not specified in profile. "
-                            f"Using default aggregation strategy '{profile.default_node_strategy}'"
+                        log_warning(
+                            f"Node property '{prop}' not specified. Using default strategy '{profile.default_node_strategy}'",
+                            LogCategory.AGGREGATION
                         )
 
                     if profile.default_node_strategy in self._node_strategies:
@@ -509,9 +546,9 @@ class AggregationManager:
                 else:
                     # Use default strategy
                     if profile.warn_on_defaults:
-                        warnings.warn(
-                            f"Edge property '{prop}' not specified in profile. "
-                            f"Using default aggregation strategy '{profile.default_edge_strategy}'"
+                        log_warning(
+                            f"Edge property '{prop}' not specified. Using default strategy '{profile.default_edge_strategy}'",
+                            LogCategory.AGGREGATION
                         )
 
                     if profile.default_edge_strategy in self._edge_strategies:
@@ -553,6 +590,8 @@ class AggregationManager:
         self._edge_strategies['first'] = FirstEdgeStrategy()
         self._edge_strategies['equivalent_reactance'] = EquivalentReactanceStrategy()
 
+        log_debug("Registered default aggregation strategies", LogCategory.MANAGER)
+
 
 class PartitionAggregatorManager:
     """Main orchestrator - the primary class users interact with."""
@@ -566,6 +605,8 @@ class PartitionAggregatorManager:
         self.input_manager = InputDataManager()
         self.partitioning_manager = PartitioningManager()
         self.aggregation_manager = AggregationManager()
+
+        log_debug("PartitionAggregatorManager initialized", LogCategory.MANAGER)
 
     def load_data(self, strategy: str, **kwargs) -> nx.DiGraph | nx.MultiDiGraph:
         """Load data using specified strategy."""
@@ -597,6 +638,12 @@ class PartitionAggregatorManager:
             strategy_metadata={},
             n_clusters=len(set(mapping.keys()))
         )
+
+        log_info(
+            f"Partitioned into {self._current_partition.n_clusters} clusters",
+            LogCategory.PARTITIONING
+        )
+
         return self._current_partition
 
     def aggregate(self, partition_result: PartitionResult = None,
@@ -713,6 +760,8 @@ class PartitionAggregatorManager:
         Returns:
             Aggregated graph
         """
+        log_info("Starting full workflow", LogCategory.MANAGER)
+
         # Parameters for data loading
         data_params = {k: v for k, v in kwargs.items()
                        if k in ['node_file', 'edge_file', 'line_file', 'transformer_file',
@@ -734,7 +783,7 @@ class PartitionAggregatorManager:
 
         # Step 2: If MultiDiGraph, aggregate parallel edges first
         if isinstance(self._current_graph, nx.MultiDiGraph):
-            print("→ MultiDiGraph detected in workflow. Auto-aggregating parallel edges...")
+            log_info("MultiDiGraph detected, auto-aggregating parallel edges", LogCategory.MANAGER)
             self.aggregate_parallel_edges(**parallel_edge_params)
 
         # For voltage-aware strategies, group voltages first
@@ -745,7 +794,10 @@ class PartitionAggregatorManager:
         partition_result = self.partition(partition_strategy, **partition_params)
 
         # Step 4: Aggregate clusters
-        return self.aggregate(partition_result, aggregation_profile, aggregation_mode)
+        result = self.aggregate(partition_result, aggregation_profile, aggregation_mode)
+
+        log_info("Full workflow complete", LogCategory.MANAGER)
+        return result
 
     def get_current_graph(self) -> Optional[nx.DiGraph]:
         """Get the current graph."""
@@ -813,6 +865,8 @@ class PartitionAggregatorManager:
                 )
             partition_map = self._current_partition.mapping
 
+        log_info(f"Creating network plot with style: {style}", LogCategory.VISUALIZATION)
+
         return plot_network(
             graph=target_graph,
             style=style,
@@ -861,6 +915,11 @@ class PartitionAggregatorManager:
 
         target_levels = sorted(target_levels)
         graph = self._current_graph
+
+        log_info(
+            f"Grouping voltages to {len(target_levels)} target levels: {target_levels}",
+            LogCategory.MANAGER
+        )
 
         # Statistics tracking
         reassignments: Dict[Any, Tuple[float, int]] = {}  # original -> (target, count)
@@ -946,9 +1005,11 @@ class PartitionAggregatorManager:
                         still_missing.append(node)
 
                 if still_missing:
-                    print(f"Warning: {len(still_missing)} nodes could not be inferred. "
-                          f"Assigning to nearest target level.")
-                    # Assign remaining to first target level (arbitrary but consistent)
+                    log_warning(
+                        f"{len(still_missing)} nodes could not be inferred. "
+                        f"Assigning to nearest target level.",
+                        LogCategory.MANAGER
+                    )
                     default_target = target_levels[0]
                     for node in still_missing:
                         graph.nodes[node][voltage_attr] = default_target
@@ -956,7 +1017,10 @@ class PartitionAggregatorManager:
                             graph.nodes[node][f'original_{voltage_attr}'] = None
                         voltage_distribution[default_target] += 1
 
-                print(f"Inferred voltage for {inferred_count} nodes from neighbors.")
+                log_info(
+                    f"Inferred voltage for {inferred_count} nodes from neighbors",
+                    LogCategory.MANAGER
+                )
 
             elif handle_missing == 'nearest':
                 # Assign to first target level (arbitrary)
@@ -968,8 +1032,10 @@ class PartitionAggregatorManager:
                     voltage_distribution[default_target] += 1
 
             elif handle_missing == 'skip':
-                # Leave as None - will form separate cluster
-                print(f"Warning: {len(missing_nodes)} nodes have no voltage (will cluster separately).")
+                log_warning(
+                    f"{len(missing_nodes)} nodes have no voltage (will cluster separately)",
+                    LogCategory.MANAGER
+                )
 
         # Update graph hash since we modified node attributes
         self._current_graph_hash = self._compute_graph_hash(self._current_graph)
