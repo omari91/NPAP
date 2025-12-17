@@ -8,10 +8,10 @@ from npap.interfaces import DataLoadingStrategy
 
 
 class CSVFilesStrategy(DataLoadingStrategy):
-    """Load graph from separate CSV files for nodes and edges"""
+    """Load graph from separate CSV files for nodes and edges."""
 
     def validate_inputs(self, **kwargs) -> bool:
-        """Validate that required CSV files are provided"""
+        """Validate that required CSV files are provided."""
         required_files = ['node_file', 'edge_file']
         missing = [file for file in required_files if file not in kwargs or kwargs[file] is None]
         if missing:
@@ -34,7 +34,7 @@ class CSVFilesStrategy(DataLoadingStrategy):
         return True
 
     def load(self, node_file: str, edge_file: str, **kwargs) -> nx.DiGraph | nx.MultiDiGraph:
-        """Load graph from CSV files as a directed graph"""
+        """Load graph from CSV files as a directed graph."""
         try:
             delimiter = kwargs["delimiter"] if 'delimiter' in kwargs else ','
             decimal = kwargs["decimal"] if 'decimal' in kwargs else '.'
@@ -84,7 +84,6 @@ class CSVFilesStrategy(DataLoadingStrategy):
             ]
 
             # Check for parallel edges (duplicate directed pairs)
-            # For directed graphs, (A->B) and (B->A) are different edges
             edge_pairs = edges_df[[edge_from_col, edge_to_col]].copy()
             edge_pairs['directed_pair'] = edge_pairs.apply(
                 lambda row: (row[edge_from_col], row[edge_to_col]), axis=1
@@ -125,8 +124,7 @@ class CSVFilesStrategy(DataLoadingStrategy):
 
     @staticmethod
     def _detect_id_column(df: pd.DataFrame, prefix: str) -> str:
-        """Detect the ID column for nodes/edges"""
-        # Common variations for ID columns
+        """Detect the ID column for nodes/edges."""
         candidates = [
             f'{prefix}_id', f'{prefix}Id', f'{prefix}_ID',
             f'{prefix}', 'id', 'Id', 'ID', 'index'
@@ -141,7 +139,7 @@ class CSVFilesStrategy(DataLoadingStrategy):
 
     @staticmethod
     def _detect_edge_column(df: pd.DataFrame, direction: str) -> str:
-        """Detect from/to columns for edges"""
+        """Detect from/to columns for edges."""
         if direction == 'from':
             candidates = ['from', 'source', 'from_node', 'source_node', 'node1', 'start', 'bus0']
         else:  # direction == 'to'
