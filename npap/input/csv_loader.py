@@ -5,6 +5,7 @@ import pandas as pd
 
 from npap.exceptions import DataLoadingError
 from npap.interfaces import DataLoadingStrategy
+from npap.logging import log_debug, log_info, log_warning, LogCategory
 
 
 class CSVFilesStrategy(DataLoadingStrategy):
@@ -31,6 +32,7 @@ class CSVFilesStrategy(DataLoadingStrategy):
                     details={'missing_file': str(file_path)}
                 )
 
+        log_debug(f"Validated input files: {kwargs.get('node_file')}, {kwargs.get('edge_file')}", LogCategory.INPUT)
         return True
 
     def load(self, node_file: str, edge_file: str, **kwargs) -> nx.DiGraph | nx.MultiDiGraph:
@@ -38,6 +40,8 @@ class CSVFilesStrategy(DataLoadingStrategy):
         try:
             delimiter = kwargs.get("delimiter", ',')
             decimal = kwargs.get("decimal", '.')
+
+            log_debug(f"Loading nodes from {node_file}", LogCategory.INPUT)
 
             # Load nodes
             nodes_df = pd.read_csv(node_file, delimiter=delimiter, decimal=decimal)
@@ -52,6 +56,8 @@ class CSVFilesStrategy(DataLoadingStrategy):
                     strategy="csv_files",
                     details={'available_columns': list(nodes_df.columns)}
                 )
+
+            log_debug(f"Loading edges from {edge_file}", LogCategory.INPUT)
 
             # Load edges
             edges_df = pd.read_csv(edge_file, delimiter=delimiter, decimal=decimal, quotechar="'")
@@ -105,13 +111,21 @@ class CSVFilesStrategy(DataLoadingStrategy):
             # Create appropriate directed graph type based on parallel edges
             if has_parallel_edges:
                 graph = nx.MultiDiGraph()
-                print("MULTI-DIGRAPH DETECTED: Parallel edges found in the data.")
-                print("Call manager.aggregate_parallel_edges() to collapse parallel edges.")
+                log_warning(
+                    "Parallel edges detected in CSV edge file. A MultiDiGraph will be created. "
+                    "Call manager.aggregate_parallel_edges() to collapse parallel edges before partitioning.",
+                    LogCategory.INPUT
+                )
             else:
                 graph = nx.DiGraph()
 
             graph.add_nodes_from(node_tuples)
             graph.add_edges_from(edge_tuples)
+
+            log_info(
+                f"Loaded graph from CSV: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges",
+                LogCategory.INPUT
+            )
 
             return graph
 
@@ -119,6 +133,8 @@ class CSVFilesStrategy(DataLoadingStrategy):
             raise DataLoadingError(f"Empty CSV file: {e}", strategy="csv_files") from e
         except pd.errors.ParserError as e:
             raise DataLoadingError(f"CSV parsing error: {e}", strategy="csv_files") from e
+        except DataLoadingError:
+            raise
         except Exception as e:
             raise DataLoadingError(f"Unexpected error loading CSV files: {e}", strategy="csv_files") from e
 
