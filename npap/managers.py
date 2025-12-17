@@ -11,18 +11,18 @@ from npap.interfaces import (
 
 
 class InputDataManager:
-    """Manages data loading from different sources"""
+    """Manages data loading from different sources."""
 
     def __init__(self):
         self._strategies: Dict[str, DataLoadingStrategy] = {}
         self._register_default_strategies()
 
-    def register_strategy(self, name: str, strategy: DataLoadingStrategy):
-        """Register a new data loading strategy"""
+    def register_strategy(self, name: str, strategy: DataLoadingStrategy) -> None:
+        """Register a new data loading strategy."""
         self._strategies[name] = strategy
 
     def load(self, strategy_name: str, **kwargs) -> nx.DiGraph | nx.MultiDiGraph:
-        """Load data using specified strategy"""
+        """Load data using specified strategy."""
         if strategy_name not in self._strategies:
             available = ', '.join(self._strategies.keys())
             raise ValueError(f"Unknown data loading strategy: {strategy_name}. Available: {available}")
@@ -31,8 +31,8 @@ class InputDataManager:
         strategy.validate_inputs(**kwargs)
         return strategy.load(**kwargs)
 
-    def _register_default_strategies(self):
-        """Register built-in loading strategies"""
+    def _register_default_strategies(self) -> None:
+        """Register built-in loading strategies."""
         from npap.input.csv_loader import CSVFilesStrategy
         from npap.input.networkx_loader import NetworkXDirectStrategy
         from npap.input.va_loader import VoltageAwareStrategy
@@ -43,26 +43,26 @@ class InputDataManager:
 
 
 class PartitioningManager:
-    """Manages partitioning strategies"""
+    """Manages partitioning strategies."""
 
     def __init__(self):
         self._strategies: Dict[str, PartitioningStrategy] = {}
         self._register_default_strategies()
 
-    def register_strategy(self, name: str, strategy: PartitioningStrategy):
-        """Register a new partitioning strategy"""
+    def register_strategy(self, name: str, strategy: PartitioningStrategy) -> None:
+        """Register a new partitioning strategy."""
         self._strategies[name] = strategy
 
     def partition(self, graph: nx.DiGraph, method: str, **kwargs) -> Dict[int, List[Any]]:
-        """Execute partitioning using specified strategy"""
+        """Execute partitioning using specified strategy."""
         if method not in self._strategies:
             available = ', '.join(self._strategies.keys())
             raise ValueError(f"Unknown partitioning strategy: {method}. Available: {available}")
 
         return self._strategies[method].partition(graph, **kwargs)
 
-    def _register_default_strategies(self):
-        """Register built-in partitioning strategies"""
+    def _register_default_strategies(self) -> None:
+        """Register built-in partitioning strategies."""
         from npap.partitioning.geographical import GeographicalPartitioning
         from npap.partitioning.electrical import ElectricalDistancePartitioning
         from npap.partitioning.va_geographical import VAGeographicalPartitioning
@@ -144,7 +144,7 @@ class PartitioningManager:
 
 class AggregationManager:
     """
-    Manages aggregation strategies and orchestrates the aggregation process
+    Manages aggregation strategies and orchestrates the aggregation process.
 
     Aggregation is a 3-step process:
     1. Topology creation (graph structure)
@@ -165,26 +165,26 @@ class AggregationManager:
 
         self._register_default_strategies()
 
-    def register_topology_strategy(self, name: str, strategy: TopologyStrategy):
-        """Register a topology strategy"""
+    def register_topology_strategy(self, name: str, strategy: TopologyStrategy) -> None:
+        """Register a topology strategy."""
         self._topology_strategies[name] = strategy
 
-    def register_physical_strategy(self, name: str, strategy: PhysicalAggregationStrategy):
-        """Register a physical aggregation strategy"""
+    def register_physical_strategy(self, name: str, strategy: PhysicalAggregationStrategy) -> None:
+        """Register a physical aggregation strategy."""
         self._physical_strategies[name] = strategy
 
-    def register_node_strategy(self, name: str, strategy: NodePropertyStrategy):
-        """Register a node property aggregation strategy"""
+    def register_node_strategy(self, name: str, strategy: NodePropertyStrategy) -> None:
+        """Register a node property aggregation strategy."""
         self._node_strategies[name] = strategy
 
-    def register_edge_strategy(self, name: str, strategy: EdgePropertyStrategy):
+    def register_edge_strategy(self, name: str, strategy: EdgePropertyStrategy) -> None:
         """Register an edge property aggregation strategy"""
         self._edge_strategies[name] = strategy
 
     @staticmethod
     def get_mode_profile(mode: AggregationMode, **overrides) -> AggregationProfile:
         """
-        Get pre-defined aggregation profile for a given mode
+        Get pre-defined aggregation profile for a given mode.
 
         Args:
             mode: Aggregation mode
@@ -199,7 +199,7 @@ class AggregationManager:
     def aggregate(self, graph: nx.DiGraph, partition_map: Dict[int, List[Any]],
                   profile: AggregationProfile = None) -> nx.DiGraph:
         """
-        Execute aggregation using the specified profile
+        Execute aggregation using the specified profile.
 
         Aggregation is a 3-step process:
         1. Create topology (nodes + edge structure)
@@ -207,7 +207,7 @@ class AggregationManager:
         3. Aggregate remaining properties statistically
         """
         if profile is None:
-            profile = AggregationProfile()  # Use defaults
+            profile = AggregationProfile()
 
         # Validate strategies exist
         self._validate_profile(profile)
@@ -245,12 +245,12 @@ class AggregationManager:
             # Warn user if they tried to override physical properties
             self._check_property_conflicts(profile, physical_modified_properties)
 
-        # Step 3: Aggregate node properties (skip properties aggregated in physical step)
+        # Step 3: Aggregate node properties
         self._aggregate_node_properties(
             graph, partition_map, aggregated, profile, physical_modified_properties
         )
 
-        # Step 4: Aggregate edge properties (skip properties aggregated in physical step)
+        # Step 4: Aggregate edge properties
         self._aggregate_edge_properties(
             graph, partition_map, aggregated, profile, physical_modified_properties
         )
@@ -323,11 +323,9 @@ class AggregationManager:
                 all_properties.update(data.keys())
 
             # Process each unique directed edge (u->v pair)
-            # For directed graphs, we process each direction separately
             processed_edges = set()
 
             for u, v in graph.edges():
-                # For directed graphs, (u, v) and (v, u) are different edges
                 edge_key = (u, v)
                 if edge_key in processed_edges:
                     continue
@@ -344,14 +342,12 @@ class AggregationManager:
 
                 for prop in all_properties:
                     if prop in edge_properties:
-                        # User specified strategy
                         strategy_name = edge_properties[prop]
                         strategy = self._edge_strategies[strategy_name]
                         aggregated_attrs[prop] = strategy.aggregate_property(
                             parallel_edges_data, prop
                         )
                     else:
-                        # Use default strategy
                         if warn_on_defaults and prop not in warned_properties:
                             warnings.warn(
                                 f"Edge property '{prop}' not specified. "
@@ -363,7 +359,6 @@ class AggregationManager:
                             parallel_edges_data, prop
                         )
 
-                # Add aggregated edge to simple graph
                 simple_graph.add_edge(u, v, **aggregated_attrs)
 
             return simple_graph
@@ -374,8 +369,8 @@ class AggregationManager:
                 strategy="parallel_edge_aggregation"
             ) from e
 
-    def _validate_profile(self, profile: AggregationProfile):
-        """Validate that all strategies in profile exist"""
+    def _validate_profile(self, profile: AggregationProfile) -> None:
+        """Validate that all strategies in profile exist."""
         if profile.topology_strategy not in self._topology_strategies:
             available = ', '.join(self._topology_strategies.keys())
             raise ValueError(
@@ -409,12 +404,8 @@ class AggregationManager:
                 )
 
     @staticmethod
-    def _check_property_conflicts(profile: AggregationProfile, physical_properties: set):
-        """
-        Check if user tried to override properties handled by physical strategy
-        Issue warnings for conflicts
-        """
-        # Check node properties
+    def _check_property_conflicts(profile: AggregationProfile, physical_properties: set) -> None:
+        """Check if user tried to override properties handled by physical strategy."""
         for prop in profile.node_properties:
             if prop in physical_properties:
                 warnings.warn(
@@ -424,7 +415,6 @@ class AggregationManager:
                     UserWarning
                 )
 
-        # Check edge properties
         for prop in profile.edge_properties:
             if prop in physical_properties:
                 warnings.warn(
@@ -436,8 +426,8 @@ class AggregationManager:
 
     def _aggregate_node_properties(self, graph: nx.DiGraph, partition_map: Dict[int, List[Any]],
                                    aggregated: nx.DiGraph, profile: AggregationProfile,
-                                   skip_properties: set = None):
-        """Aggregate node properties statistically, skipping properties aggregated in physical step"""
+                                   skip_properties: set = None) -> None:
+        """Aggregate node properties statistically."""
         skip_properties = skip_properties or set()
 
         # Collect all possible properties
@@ -479,8 +469,8 @@ class AggregationManager:
 
     def _aggregate_edge_properties(self, graph: nx.DiGraph, partition_map: Dict[int, List[Any]],
                                    aggregated: nx.DiGraph, profile: AggregationProfile,
-                                   skip_properties: set = None):
-        """Aggregate edge properties statistically, skipping properties aggregated in physical step"""
+                                   skip_properties: set = None) -> None:
+        """Aggregate edge properties statistically."""
         skip_properties = skip_properties or set()
 
         # Collect all possible edge properties
@@ -494,7 +484,7 @@ class AggregationManager:
             nodes1 = partition_map[cluster1]
             nodes2 = partition_map[cluster2]
 
-            # Find all original edges between these clusters (respecting direction)
+            # Find all original edges between these clusters
             original_edges = []
             for n1 in nodes1:
                 for n2 in nodes2:
@@ -534,8 +524,8 @@ class AggregationManager:
             # Update edge attributes
             aggregated.edges[edge].update(edge_attrs)
 
-    def _register_default_strategies(self):
-        """Register built-in aggregation strategies"""
+    def _register_default_strategies(self) -> None:
+        """Register built-in aggregation strategies."""
         from npap.aggregation.basic_strategies import (
             SimpleTopologyStrategy, ElectricalTopologyStrategy,
             SumNodeStrategy, AverageNodeStrategy, FirstNodeStrategy,
@@ -565,7 +555,7 @@ class AggregationManager:
 
 
 class PartitionAggregatorManager:
-    """Main orchestrator - the primary class users interact with"""
+    """Main orchestrator - the primary class users interact with."""
 
     def __init__(self):
         self._current_graph: Optional[nx.DiGraph] = None
@@ -578,18 +568,18 @@ class PartitionAggregatorManager:
         self.aggregation_manager = AggregationManager()
 
     def load_data(self, strategy: str, **kwargs) -> nx.DiGraph | nx.MultiDiGraph:
-        """Load data using specified strategy"""
+        """Load data using specified strategy."""
         self._current_graph = self.input_manager.load(strategy, **kwargs)
         self._current_graph_hash = self._compute_graph_hash(self._current_graph)
         self._current_partition = None  # Clear any existing partition
         return self._current_graph
 
     def partition(self, strategy: str, **kwargs) -> PartitionResult:
-        """Partition current graph and store result"""
+        """Partition current graph and store result."""
         if not self._current_graph:
             raise ValueError("No graph loaded. Call load_data() first.")
 
-        # Check if graph is MultiDiGraph - cannot partition MultiDiGraphs
+        # Check if graph is MultiDiGraph
         if isinstance(self._current_graph, nx.MultiDiGraph):
             raise ValueError(
                 "Cannot partition MultiDiGraph directly. MultiDiGraphs contain parallel edges "
@@ -613,7 +603,7 @@ class PartitionAggregatorManager:
                   profile: AggregationProfile = None,
                   mode: AggregationMode = None, **overrides) -> nx.DiGraph:
         """
-        Aggregate using partition result and profile
+        Aggregate using partition result and profile.
 
         Args:
             partition_result: Partition to use (or use stored partition)
@@ -707,7 +697,7 @@ class PartitionAggregatorManager:
                       aggregation_mode: AggregationMode = None,
                       **kwargs) -> nx.DiGraph:
         """
-        Execute complete workflow without storing intermediates
+        Execute complete workflow without storing intermediates.
 
         If a MultiDiGraph is loaded, parallel edges will be automatically aggregated
         before partitioning.
@@ -753,16 +743,16 @@ class PartitionAggregatorManager:
         return self.aggregate(partition_result, aggregation_profile, aggregation_mode)
 
     def get_current_graph(self) -> Optional[nx.DiGraph]:
-        """Get the current graph"""
+        """Get the current graph."""
         return self._current_graph
 
     def get_current_partition(self) -> Optional[PartitionResult]:
-        """Get the current partition result"""
+        """Get the current partition result."""
         return self._current_partition
 
     @staticmethod
     def _compute_graph_hash(graph: nx.DiGraph) -> str:
-        """Compute hash for graph validation"""
+        """Compute hash for graph validation."""
         from npap.utils import compute_graph_hash
         return compute_graph_hash(graph)
 
@@ -842,10 +832,10 @@ class PartitionAggregatorManager:
             voltage_attr: Node attribute containing voltage level (default: 'voltage').
             store_original: If True, stores original voltage in 'original_{voltage_attr}'.
             handle_missing: How to handle nodes without voltage data:
-                           - 'infer': Infer from connected neighbors (via edges)
-                           - 'nearest': Assign to nearest target level (arbitrary)
+                           - 'infer': Infer from connected neighbors
+                           - 'nearest': Assign to nearest target level
                            - 'error': Raise an error
-                           - 'skip': Leave as None (will form separate cluster)
+                           - 'skip': Leave as None
 
         Returns:
             Summary dict with:
@@ -864,7 +854,7 @@ class PartitionAggregatorManager:
         if not target_levels:
             raise ValueError("target_levels cannot be empty.")
 
-        target_levels = sorted(target_levels)  # Sort for consistent behavior
+        target_levels = sorted(target_levels)
         graph = self._current_graph
 
         # Statistics tracking
