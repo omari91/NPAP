@@ -390,7 +390,7 @@ class TestElectricalDistancePartitioning:
 
         strategy = ElectricalDistancePartitioning()
 
-        with pytest.raises(PartitioningError, match="connected"):
+        with pytest.raises(PartitioningError, match="Cannot compute electrical distances without AC connectivity"):
             strategy.partition(G, n_clusters=1)
 
     def test_missing_reactance_raises_error(self):
