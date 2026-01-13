@@ -8,13 +8,16 @@ repos:
     hooks:
       - id: check-merge-conflict
       - id: end-of-file-fixer
+        exclude: '\.svg$'
       - id: fix-byte-order-marker
       - id: mixed-line-ending
+        exclude: '\.svg$'
       - id: trailing-whitespace
+        exclude: '\.svg$'
       - id: check-yaml
         args: ["--unsafe"]
       - id: check-added-large-files
-        args: ["--maxkb=2000"]
+        args: ["--maxkb=30000"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.6
@@ -27,5 +30,6 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
+        exclude: '\.svg$'
         additional_dependencies:
           - tomli
