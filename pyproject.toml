@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Contributors to NPAP
+# SPDX-License-Identifier: MIT
+
 [build-system]
 requires = ["setuptools>=61.0", "setuptools_scm>=8.0"]
 build-backend = "setuptools.build_meta"
@@ -7,47 +10,139 @@ name = "npap"
 dynamic = ["version"]
 description = "Network Partitioning & Aggregation Package"
 readme = "README.md"
-authors = [
-    { name = "Marco Antonio Arnaiz Montero" },
-]
+authors = [{ name = "Marco Anarmo" }]
 license = { file = "LICENSE" }
 classifiers = [
-    "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
 ]
+keywords = ["network", "partitioning", "aggregation", "power-systems", "clustering"]
 
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 
 dependencies = [
     "hdbscan>=0.8.41",
     "kmedoids>=0.5.4",
-    "networkx>=3.6.1",
-    "numpy>=2.3.5",
-    "pandas>=2.3.3",
-    "plotly>=6.5.0",
-    "scikit-learn>=1.8.0",
-    "scipy>=1.16.3",
+    "networkx>=3.0",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "plotly>=5.0",
+    "scikit-learn>=1.3",
+    "scipy>=1.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/npap"
+Documentation = "https://npap.readthedocs.io"
+Repository = "https://github.com/your-org/npap"
+Changelog = "https://github.com/your-org/npap/releases"
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "pytest-cov>=4.0"]
+dev = ["pre-commit>=3.0", "ruff>=0.8.0"]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-book-theme>=1.0",
+    "myst-parser>=2.0",
+    "sphinx-autodoc-typehints>=2.0",
+    "sphinx-copybutton>=0.5",
+    "numpydoc>=1.6",
 ]
 
 [tool.setuptools.packages.find]
-include = ["npap"]
+include = ["npap", "npap.*"]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
 local_scheme = "node-and-date"
 
-[project.optional-dependencies]
-test = [
-    "pytest",
-    "pytest-cov", # Optional: good for future coverage reports
+# =============================================================================
+# Ruff Configuration
+# =============================================================================
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "F",     # Pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "D",     # pydocstyle
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "PL",    # pylint
+    "RUF",   # Ruff-specific rules
 ]
-dev = [
-    "black", # formatting
-    "ruff", # linting
+ignore = [
+    "D100",  # Missing docstring in public module
+    "D104",  # Missing docstring in public package
+    "D105",  # Missing docstring in magic method
+    "D107",  # Missing docstring in __init__
+    "D203",  # 1 blank line required before class docstring (conflicts with D211)
+    "D213",  # Multi-line docstring summary should start at the second line (conflicts with D212)
+    "PLR0913",  # Too many arguments in function definition
+    "PLR2004",  # Magic value used in comparison
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"test/*" = ["D", "PLR0915", "PLR0912"]
+"docs/conf.py" = ["D", "E501"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.isort]
+known-first-party = ["npap"]
+
+# =============================================================================
+# Pytest Configuration
+# =============================================================================
 [tool.pytest.ini_options]
+minversion = "7.0"
 testpaths = ["test"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short"
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "-ra",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# =============================================================================
+# Coverage Configuration
+# =============================================================================
+[tool.coverage.run]
+source = ["npap"]
+branch = true
+omit = ["npap/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+precision = 2
+
+# =============================================================================
+# Codespell Configuration
+# =============================================================================
+[tool.codespell]
+skip = "*.lock,*.svg,.git"
+ignore-words-list = "crate"
