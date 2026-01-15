@@ -1,6 +1,7 @@
 import functools
 import hashlib
 import json
+from collections import defaultdict
 from dataclasses import replace
 from typing import Any, TypeVar
 
@@ -246,15 +247,12 @@ def create_partition_map(nodes: list[Any], labels: np.ndarray) -> dict[int, list
     -------
         Dictionary mapping cluster_id -> list of node_ids
     """
-    partition_map: dict[int, list[Any]] = {}
+    partition_map: dict[int, list[Any]] = defaultdict(list)
 
     for i, label in enumerate(labels):
-        cluster_id = int(label)
-        if cluster_id not in partition_map:
-            partition_map[cluster_id] = []
-        partition_map[cluster_id].append(nodes[i])
+        partition_map[int(label)].append(nodes[i])
 
-    return partition_map
+    return dict(partition_map)
 
 
 def validate_partition(

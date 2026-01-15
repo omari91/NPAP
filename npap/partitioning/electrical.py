@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
@@ -494,16 +495,13 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         -------
             Dictionary mapping island_id -> list of nodes in that island
         """
-        islands: dict[Any, list[Any]] = {}
+        islands: dict[Any, list[Any]] = defaultdict(list)
 
         for node in nodes:
             island_id = graph.nodes[node].get(self.dc_island_attr)
-
-            if island_id not in islands:
-                islands[island_id] = []
             islands[island_id].append(node)
 
-        return islands
+        return dict(islands)
 
     def _extract_ac_subgraph(self, graph: nx.DiGraph, island_nodes: list[Any]) -> nx.DiGraph:
         """
@@ -635,13 +633,11 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             island_nodes: Ordered list of nodes in this island
             node_to_idx: Mapping from node to index in full matrix
         """
-        n_island = len(island_nodes)
+        # Build index array for island nodes in full matrix
+        island_indices = np.array([node_to_idx[node] for node in island_nodes])
 
-        for i in range(n_island):
-            full_i = node_to_idx[island_nodes[i]]
-            for j in range(n_island):
-                full_j = node_to_idx[island_nodes[j]]
-                full_matrix[full_i, full_j] = island_distances[i, j]
+        # Use np.ix_ for efficient block assignment
+        full_matrix[np.ix_(island_indices, island_indices)] = island_distances
 
     # =========================================================================
     # PTDF MATRIX CONSTRUCTION
@@ -801,17 +797,21 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         # Create node index mapping for active nodes
         node_to_idx = {node: idx for idx, node in enumerate(active_nodes)}
 
-        # Build incidence matrix directly as dense array
+        # Build incidence matrix using vectorized assignment
         K_sba = np.zeros((n_edges, n_active))
 
-        for edge_idx, (u, v) in enumerate(edges):
-            # Edge leaves u: K[edge, u] = -1
-            if u in node_to_idx:
-                K_sba[edge_idx, node_to_idx[u]] = -1.0
+        # Pre-compute indices for all edges (-1 means node not in active set)
+        u_indices = np.array([node_to_idx.get(u, -1) for u, v in edges])
+        v_indices = np.array([node_to_idx.get(v, -1) for u, v in edges])
+        edge_indices = np.arange(n_edges)
 
-            # Edge enters v: K[edge, v] = +1
-            if v in node_to_idx:
-                K_sba[edge_idx, node_to_idx[v]] = 1.0
+        # Vectorized assignment for valid source nodes
+        valid_u = u_indices >= 0
+        K_sba[edge_indices[valid_u], u_indices[valid_u]] = -1.0
+
+        # Vectorized assignment for valid target nodes
+        valid_v = v_indices >= 0
+        K_sba[edge_indices[valid_v], v_indices[valid_v]] = 1.0
 
         return K_sba, active_nodes
 
@@ -978,19 +978,18 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         slack_idx = island_nodes.index(slack_bus)
 
         # Map active indices to island indices
-        active_to_island = [island_nodes.index(n) for n in active_nodes]
+        active_to_island = np.array([island_nodes.index(n) for n in active_nodes])
 
-        # Copy active distances to island matrix
-        for i, island_i in enumerate(active_to_island):
-            for j, island_j in enumerate(active_to_island):
-                distance_matrix_island[island_i, island_j] = distance_matrix_active[i, j]
+        # Copy active distances to island matrix using fancy indexing
+        distance_matrix_island[np.ix_(active_to_island, active_to_island)] = distance_matrix_active
 
-        # Calculate slack bus distances
-        # Distance from slack to node i = ||PTDF[:,i]||_2 (L2 norm of column i)
-        for i, island_i in enumerate(active_to_island):
-            ptdf_column_norm = np.linalg.norm(ptdf_matrix[:, i])
-            distance_matrix_island[slack_idx, island_i] = ptdf_column_norm
-            distance_matrix_island[island_i, slack_idx] = ptdf_column_norm
+        # Calculate slack bus distances (vectorized)
+        # Distance from slack to node i = ||PTDF[:,i]||_2 (L2 norm of each column)
+        ptdf_column_norms = np.linalg.norm(ptdf_matrix, axis=0)
+
+        # Assign slack distances using vectorized indexing
+        distance_matrix_island[slack_idx, active_to_island] = ptdf_column_norms
+        distance_matrix_island[active_to_island, slack_idx] = ptdf_column_norms
 
         # Validate island matrix
         if np.any(np.isnan(distance_matrix_island)):

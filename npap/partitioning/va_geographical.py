@@ -622,25 +622,26 @@ class VAGeographicalPartitioning(PartitioningStrategy):
         # Calculate geographical distances using utility function
         geo_distances = compute_geographical_distances(coordinates, self.distance_metric)
 
-        # Initialize distance matrix with infinite distances
-        distance_matrix = np.full((n_nodes, n_nodes), config.infinite_distance)
+        # same_dc_island[i,j] = True if dc_islands[i] == dc_islands[j]
+        same_dc_island = dc_islands[:, np.newaxis] == dc_islands[np.newaxis, :]
 
-        compatible_pairs = 0
-        for i in range(n_nodes):
-            distance_matrix[i, i] = 0.0
+        # Handle None DC islands (incompatible with everything)
+        dc_not_none = np.array([island is not None for island in dc_islands])
+        dc_both_valid = dc_not_none[:, np.newaxis] & dc_not_none[np.newaxis, :]
+        dc_compatible = same_dc_island & dc_both_valid
 
-            for j in range(i + 1, n_nodes):
-                # Check DC island compatibility first (primary constraint)
-                if not self._islands_compatible(dc_islands[i], dc_islands[j]):
-                    continue
+        # Voltage compatibility mask
+        voltage_compatible = self._build_voltage_compatibility_mask(voltages, config)
 
-                if not self._voltages_compatible(voltages[i], voltages[j], config):
-                    continue
+        # Combine masks
+        compatible_mask = dc_compatible & voltage_compatible
 
-                # Both constraints satisfied - use geographical distance
-                distance_matrix[i, j] = geo_distances[i, j]
-                distance_matrix[j, i] = geo_distances[i, j]
-                compatible_pairs += 1
+        # Build distance matrix using vectorized where
+        distance_matrix = np.where(compatible_mask, geo_distances, config.infinite_distance)
+        np.fill_diagonal(distance_matrix, 0.0)
+
+        # Log statistics (count compatible pairs, excluding diagonal)
+        compatible_pairs = (np.sum(compatible_mask) - n_nodes) // 2
 
         log_debug(
             f"Built aware distance matrix: {compatible_pairs} compatible pairs",
@@ -648,6 +649,63 @@ class VAGeographicalPartitioning(PartitioningStrategy):
         )
 
         return distance_matrix
+
+    @staticmethod
+    def _build_voltage_compatibility_mask(
+        voltages: np.ndarray, config: VAGeographicalConfig
+    ) -> np.ndarray:
+        """
+        Build voltage compatibility mask.
+
+        Handles three cases:
+        1. Both numeric: compatible if within tolerance
+        2. Both non-numeric (not None): compatible if exact match
+        3. None values: incompatible with everything
+
+        Args:
+            voltages: Array of voltage values
+            config: VAGeographicalConfig instance
+
+        Returns
+        -------
+            Boolean mask (n x n) where True indicates voltage compatibility
+        """
+        # Categorize voltages
+        is_numeric = np.array([isinstance(v, (int, float)) for v in voltages])
+        is_none = np.array([v is None for v in voltages])
+
+        # None values are incompatible with everything
+        neither_none = ~is_none[:, np.newaxis] & ~is_none[np.newaxis, :]
+
+        # For numeric values: tolerance-based comparison
+        float_voltages = np.array(
+            [float(v) if isinstance(v, (int, float)) else 0.0 for v in voltages],
+            dtype=np.float64,
+        )
+        voltage_diff = np.abs(float_voltages[:, np.newaxis] - float_voltages[np.newaxis, :])
+        numeric_compatible = voltage_diff <= config.voltage_tolerance
+        both_numeric = is_numeric[:, np.newaxis] & is_numeric[np.newaxis, :]
+
+        # Initialize with numeric compatibility for numeric pairs
+        voltage_compatible = both_numeric & numeric_compatible
+
+        # Handle non-numeric values (not None): exact equality required
+        is_non_numeric = ~is_numeric & ~is_none
+        if np.any(is_non_numeric):
+            # For non-numeric pairs, check exact equality
+            both_non_numeric = is_non_numeric[:, np.newaxis] & is_non_numeric[np.newaxis, :]
+            if np.any(both_non_numeric):
+                # Build equality mask for non-numeric values only
+                non_numeric_indices = np.where(is_non_numeric)[0]
+                for i in non_numeric_indices:
+                    for j in non_numeric_indices:
+                        if voltages[i] == voltages[j]:
+                            voltage_compatible[i, j] = True
+
+        # Apply None mask
+        voltage_compatible &= neither_none
+
+        return voltage_compatible
 
     # =========================================================================
     # COMPATIBILITY CHECK METHODS
