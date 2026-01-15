@@ -234,6 +234,15 @@ class AggregationManager:
         # Validate strategies exist
         self._validate_profile(profile)
 
+        # Pre-compute mappings for efficient aggregation
+        from npap.aggregation.basic_strategies import (
+            build_cluster_edge_map,
+            build_node_to_cluster_map,
+        )
+
+        node_to_cluster = build_node_to_cluster_map(partition_map)
+        cluster_edge_map = build_cluster_edge_map(graph, node_to_cluster)
+
         # Step 1: Create topology
         topology_strategy = self._topology_strategies[profile.topology_strategy]
         aggregated = topology_strategy.create_topology(graph, partition_map)
@@ -280,7 +289,12 @@ class AggregationManager:
 
         # Step 4: Aggregate edge properties
         self._aggregate_edge_properties(
-            graph, partition_map, aggregated, profile, physical_modified_properties
+            graph,
+            partition_map,
+            aggregated,
+            profile,
+            physical_modified_properties,
+            cluster_edge_map,
         )
 
         log_info(
@@ -324,6 +338,8 @@ class AggregationManager:
             ValueError: If graph is not a MultiDiGraph
             AggregationError: If aggregation fails
         """
+        from collections import defaultdict
+
         from npap.exceptions import AggregationError
 
         # Validate input
@@ -356,57 +372,40 @@ class AggregationManager:
             )
 
         try:
-            # Create simple directed graph
+            # Create simple directed graph with all nodes
             simple_graph = nx.DiGraph()
-
-            # Copy all nodes with their attributes
             simple_graph.add_nodes_from(graph.nodes(data=True))
 
-            # Collect all edge properties
-            all_properties = set()
+            # Group edges by (u, v) and collect all properties
+            edge_groups: dict[tuple, list[dict]] = defaultdict(list)
+            all_properties: set[str] = set()
+
             for u, v, data in graph.edges(data=True):
+                edge_groups[(u, v)].append(data)
                 all_properties.update(data.keys())
 
-            # Process each unique directed edge (u->v pair)
-            processed_edges = set()
+            # Pre-resolve strategies for each property
+            property_strategies = self._resolve_property_strategies(
+                properties=all_properties,
+                user_specified=edge_properties,
+                available_strategies=self._edge_strategies,
+                default_strategy=default_strategy,
+                warn_on_defaults=warn_on_defaults,
+                property_type="Edge",
+            )
+
+            # Process each unique edge group
             parallel_count = 0
 
-            for u, v in graph.edges():
-                edge_key = (u, v)
-                if edge_key in processed_edges:
-                    continue
-                processed_edges.add(edge_key)
-
-                # Get all parallel edges from u to v (same direction only)
-                parallel_edges_data = []
-                for key in graph[u][v]:
-                    parallel_edges_data.append(graph[u][v][key])
-
+            for (u, v), parallel_edges_data in edge_groups.items():
                 if len(parallel_edges_data) > 1:
                     parallel_count += 1
 
-                # Aggregate properties
-                aggregated_attrs = {}
-                warned_properties = set()
-
-                for prop in all_properties:
-                    if prop in edge_properties:
-                        strategy_name = edge_properties[prop]
-                        strategy = self._edge_strategies[strategy_name]
-                        aggregated_attrs[prop] = strategy.aggregate_property(
-                            parallel_edges_data, prop
-                        )
-                    else:
-                        if warn_on_defaults and prop not in warned_properties:
-                            log_warning(
-                                f"Edge property '{prop}' not specified. Using default strategy '{default_strategy}'",
-                                LogCategory.AGGREGATION,
-                            )
-                            warned_properties.add(prop)
-                        strategy = self._edge_strategies[default_strategy]
-                        aggregated_attrs[prop] = strategy.aggregate_property(
-                            parallel_edges_data, prop
-                        )
+                # Aggregate all properties using pre-resolved strategies
+                aggregated_attrs = {
+                    prop: strategy.aggregate_property(parallel_edges_data, prop)
+                    for prop, strategy in property_strategies.items()
+                }
 
                 simple_graph.add_edge(u, v, **aggregated_attrs)
 
@@ -474,6 +473,51 @@ class AggregationManager:
                     LogCategory.AGGREGATION,
                 )
 
+    @staticmethod
+    def _resolve_property_strategies(
+        properties: set[str],
+        user_specified: dict[str, str],
+        available_strategies: dict[str, Any],
+        default_strategy: str,
+        warn_on_defaults: bool,
+        property_type: str,
+    ) -> dict[str, Any]:
+        """
+        Resolve strategies for a set of properties.
+
+        Args:
+            properties: Set of property names to resolve
+            user_specified: User-specified property -> strategy name mapping
+            available_strategies: Available strategy name -> strategy object mapping
+            default_strategy: Default strategy name to use
+            warn_on_defaults: Whether to warn when using default strategy
+            property_type: "Node" or "Edge" for warning messages
+
+        Returns
+        -------
+            Dict mapping property name -> strategy object (or None for fallback)
+        """
+        property_strategies: dict[str, Any] = {}
+        warned_properties: set[str] = set()
+
+        for prop in properties:
+            if prop in user_specified:
+                strategy_name = user_specified[prop]
+                property_strategies[prop] = available_strategies[strategy_name]
+            elif default_strategy in available_strategies:
+                if warn_on_defaults and prop not in warned_properties:
+                    log_warning(
+                        f"{property_type} property '{prop}' not specified. "
+                        f"Using default strategy '{default_strategy}'",
+                        LogCategory.AGGREGATION,
+                    )
+                    warned_properties.add(prop)
+                property_strategies[prop] = available_strategies[default_strategy]
+            else:
+                property_strategies[prop] = None  # Will use fallback
+
+        return property_strategies
+
     def _aggregate_node_properties(
         self,
         graph: nx.DiGraph,
@@ -485,43 +529,37 @@ class AggregationManager:
         """Aggregate node properties statistically."""
         skip_properties = skip_properties or set()
 
-        # Collect all possible properties
-        all_properties = set()
+        # Collect all possible properties in single pass
+        all_properties: set[str] = set()
         for nodes in partition_map.values():
             for node in nodes:
                 all_properties.update(graph.nodes[node].keys())
 
+        # Remove properties to skip
+        properties_to_aggregate = all_properties - skip_properties
+
+        # Pre-resolve strategies
+        property_strategies = self._resolve_property_strategies(
+            properties=properties_to_aggregate,
+            user_specified=profile.node_properties,
+            available_strategies=self._node_strategies,
+            default_strategy=profile.default_node_strategy,
+            warn_on_defaults=profile.warn_on_defaults,
+            property_type="Node",
+        )
+
+        # Aggregate properties for each cluster
         for cluster_id, nodes in partition_map.items():
             node_attrs = {}
 
-            for prop in all_properties:
-                # Skip properties handled by physical aggregation
-                if prop in skip_properties:
-                    continue
-
-                if prop in profile.node_properties:
-                    # User specified strategy
-                    strategy_name = profile.node_properties[prop]
-                    strategy = self._node_strategies[strategy_name]
+            for prop, strategy in property_strategies.items():
+                if strategy is not None:
                     node_attrs[prop] = strategy.aggregate_property(graph, nodes, prop)
-                else:
-                    # Use default strategy with optional warning
-                    if profile.warn_on_defaults:
-                        log_warning(
-                            f"Node property '{prop}' not specified. Using default strategy '{profile.default_node_strategy}'",
-                            LogCategory.AGGREGATION,
-                        )
+                elif nodes:
+                    # Fallback to first value
+                    node_attrs[prop] = graph.nodes[nodes[0]].get(prop)
 
-                    if profile.default_node_strategy in self._node_strategies:
-                        strategy = self._node_strategies[profile.default_node_strategy]
-                        node_attrs[prop] = strategy.aggregate_property(graph, nodes, prop)
-                    else:
-                        # Fallback to first value
-                        node_attrs[prop] = graph.nodes[nodes[0]].get(
-                            prop
-                        )  # TODO: handle empty nodes list?
-
-            # Update node attributes
+            # Batch update node attributes
             aggregated.nodes[cluster_id].update(node_attrs)
 
     def _aggregate_edge_properties(
@@ -531,59 +569,59 @@ class AggregationManager:
         aggregated: nx.DiGraph,
         profile: AggregationProfile,
         skip_properties: set = None,
+        cluster_edge_map: dict[tuple[int, int], list[dict[str, Any]]] = None,
     ) -> None:
         """Aggregate edge properties statistically."""
         skip_properties = skip_properties or set()
 
-        # Collect all possible edge properties
-        all_properties = set()
-        for edge in graph.edges():
-            all_properties.update(graph.edges[edge].keys())
+        # Build cluster_edge_map if not provided
+        if cluster_edge_map is None:
+            from npap.aggregation.basic_strategies import (
+                build_cluster_edge_map,
+                build_node_to_cluster_map,
+            )
 
-        # For each edge in aggregated graph, find corresponding original edges
+            node_to_cluster = build_node_to_cluster_map(partition_map)
+            cluster_edge_map = build_cluster_edge_map(graph, node_to_cluster)
+
+        # Collect all possible edge properties in single pass
+        all_properties: set[str] = set()
+        for edge_list in cluster_edge_map.values():
+            for edge_data in edge_list:
+                all_properties.update(edge_data.keys())
+
+        # Remove properties to skip
+        properties_to_aggregate = all_properties - skip_properties
+
+        # Pre-resolve strategies
+        property_strategies = self._resolve_property_strategies(
+            properties=properties_to_aggregate,
+            user_specified=profile.edge_properties,
+            available_strategies=self._edge_strategies,
+            default_strategy=profile.default_edge_strategy,
+            warn_on_defaults=profile.warn_on_defaults,
+            property_type="Edge",
+        )
+
+        # Aggregate properties for each edge using pre-computed mapping (O(1) lookup)
         for edge in aggregated.edges():
             cluster1, cluster2 = edge
-            nodes1 = partition_map[cluster1]
-            nodes2 = partition_map[cluster2]
 
-            # Find all original edges between these clusters
-            original_edges = []
-            for n1 in nodes1:
-                for n2 in nodes2:
-                    if graph.has_edge(n1, n2):
-                        original_edges.append(graph.edges[n1, n2])
+            original_edges = cluster_edge_map.get((cluster1, cluster2), [])
 
             if not original_edges:
                 continue
 
             # Aggregate properties
             edge_attrs = {}
-            for prop in all_properties:
-                # Skip properties handled by physical aggregation
-                if prop in skip_properties:
-                    continue
-
-                if prop in profile.edge_properties:
-                    # User specified strategy
-                    strategy_name = profile.edge_properties[prop]
-                    strategy = self._edge_strategies[strategy_name]
+            for prop, strategy in property_strategies.items():
+                if strategy is not None:
                     edge_attrs[prop] = strategy.aggregate_property(original_edges, prop)
-                else:
-                    # Use default strategy
-                    if profile.warn_on_defaults:
-                        log_warning(
-                            f"Edge property '{prop}' not specified. Using default strategy '{profile.default_edge_strategy}'",
-                            LogCategory.AGGREGATION,
-                        )
+                elif original_edges:
+                    # Fallback to first value
+                    edge_attrs[prop] = original_edges[0].get(prop)
 
-                    if profile.default_edge_strategy in self._edge_strategies:
-                        strategy = self._edge_strategies[profile.default_edge_strategy]
-                        edge_attrs[prop] = strategy.aggregate_property(original_edges, prop)
-                    else:
-                        # Fallback to first value
-                        edge_attrs[prop] = original_edges[0].get(prop) if original_edges else None
-
-            # Update edge attributes
+            # Batch update edge attributes
             aggregated.edges[edge].update(edge_attrs)
 
     def _register_default_strategies(self) -> None:

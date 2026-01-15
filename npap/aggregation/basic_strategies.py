@@ -1,11 +1,97 @@
 import itertools
+from collections import defaultdict
 from typing import Any
 
 import networkx as nx
+import numpy as np
 
 from npap.exceptions import AggregationError
 from npap.interfaces import EdgePropertyStrategy, NodePropertyStrategy, TopologyStrategy
 from npap.logging import LogCategory, log_debug
+
+# ============================================================================
+# PRECOMPUTATION UTILITIES - Build mappings for fast lookups
+# ============================================================================
+
+
+def build_node_to_cluster_map(partition_map: dict[int, list[Any]]) -> dict[Any, int]:
+    """
+    Build a reverse mapping from node ID to cluster ID.
+
+    Args:
+        partition_map: Dict mapping cluster_id -> list of node IDs
+
+    Returns
+    -------
+        Dict mapping node_id -> cluster_id for O(1) lookups
+    """
+    node_to_cluster = {}
+    for cluster_id, nodes in partition_map.items():
+        for node in nodes:
+            node_to_cluster[node] = cluster_id
+    return node_to_cluster
+
+
+def build_cluster_edge_map(
+    graph: nx.DiGraph, node_to_cluster: dict[Any, int]
+) -> dict[tuple[int, int], list[dict[str, Any]]]:
+    """
+    Build a mapping from cluster pairs to their original edge data.
+
+    Single pass over all edges - O(E) complexity.
+
+    Args:
+        graph: Original NetworkX graph
+        node_to_cluster: Mapping from node_id -> cluster_id
+
+    Returns
+    -------
+        Dict mapping (source_cluster, target_cluster) -> list of edge attribute dicts
+    """
+    cluster_edges: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
+
+    for u, v, data in graph.edges(data=True):
+        cluster_u = node_to_cluster.get(u)
+        cluster_v = node_to_cluster.get(v)
+
+        # Skip edges where nodes aren't in the partition (shouldn't happen normally)
+        if cluster_u is None or cluster_v is None:
+            continue
+
+        # Skip self-loops at cluster level (internal edges)
+        if cluster_u != cluster_v:
+            cluster_edges[(cluster_u, cluster_v)].append(data)
+
+    return dict(cluster_edges)
+
+
+def build_cluster_connectivity_set(
+    graph: nx.DiGraph, node_to_cluster: dict[Any, int]
+) -> set[tuple[int, int]]:
+    """
+    Build a set of connected cluster pairs from original graph edges.
+
+    Single pass over all edges - O(E) complexity.
+
+    Args:
+        graph: Original NetworkX graph
+        node_to_cluster: Mapping from node_id -> cluster_id
+
+    Returns
+    -------
+        Set of (source_cluster, target_cluster) tuples where edges exist
+    """
+    connected_clusters: set[tuple[int, int]] = set()
+
+    for u, v in graph.edges():
+        cluster_u = node_to_cluster.get(u)
+        cluster_v = node_to_cluster.get(v)
+
+        if cluster_u is not None and cluster_v is not None and cluster_u != cluster_v:
+            connected_clusters.add((cluster_u, cluster_v))
+
+    return connected_clusters
+
 
 # ============================================================================
 # TOPOLOGY STRATEGIES - Define graph structure
@@ -30,11 +116,22 @@ class SimpleTopologyStrategy(TopologyStrategy):
             aggregated = nx.DiGraph()
 
             # Step 1: Create nodes (one per cluster)
-            for cluster_id in partition_map.keys():
-                aggregated.add_node(cluster_id)
+            aggregated.add_nodes_from(partition_map.keys())
 
-            # Step 2: Create edges only where connections exist
-            _create_edges_with_existing_connection(partition_map, graph, aggregated)
+            # Step 2: Build node-to-cluster mapping
+            node_to_cluster = build_node_to_cluster_map(partition_map)
+
+            # Step 3: Find connected cluster pairs in single pass
+            connected_clusters = build_cluster_connectivity_set(graph, node_to_cluster)
+
+            # Step 4: Add edges for connected clusters
+            aggregated.add_edges_from(connected_clusters)
+
+            log_debug(
+                f"SimpleTopology: {aggregated.number_of_nodes()} nodes, "
+                f"{aggregated.number_of_edges()} edges",
+                LogCategory.AGGREGATION,
+            )
 
             return aggregated
 
@@ -77,13 +174,12 @@ class ElectricalTopologyStrategy(TopologyStrategy):
             aggregated = nx.DiGraph()
 
             # Step 1: Create nodes
-            for cluster_id in partition_map.keys():
-                aggregated.add_node(cluster_id)
+            aggregated.add_nodes_from(partition_map.keys())
 
             # Step 2: Create edges based on connectivity mode
             if self.initial_connectivity == "full":
-                for cluster1, cluster2 in itertools.permutations(partition_map.keys(), 2):
-                    aggregated.add_edge(cluster1, cluster2)
+                # Add all permutations as edges (excluding self-loops)
+                aggregated.add_edges_from(itertools.permutations(partition_map.keys(), 2))
                 log_debug(
                     f"ElectricalTopology (full): {len(partition_map)} nodes, "
                     f"{aggregated.number_of_edges()} edges",
@@ -91,7 +187,20 @@ class ElectricalTopologyStrategy(TopologyStrategy):
                 )
 
             elif self.initial_connectivity == "existing":
-                _create_edges_with_existing_connection(partition_map, graph, aggregated)
+                # Build node-to-cluster mapping
+                node_to_cluster = build_node_to_cluster_map(partition_map)
+
+                # Find connected cluster pairs in single pass
+                connected_clusters = build_cluster_connectivity_set(graph, node_to_cluster)
+
+                # Add edges
+                aggregated.add_edges_from(connected_clusters)
+
+                log_debug(
+                    f"ElectricalTopology (existing): {len(partition_map)} nodes, "
+                    f"{aggregated.number_of_edges()} edges",
+                    LogCategory.AGGREGATION,
+                )
 
             else:
                 raise AggregationError(
@@ -115,55 +224,40 @@ class ElectricalTopologyStrategy(TopologyStrategy):
         return self.initial_connectivity == "full"
 
 
-def _clusters_connected_directed(
-    graph: nx.DiGraph, source_nodes: list[Any], target_nodes: list[Any]
-) -> bool:
-    """Return True if any directed edge exists from source_nodes to target_nodes."""
-    for n1 in source_nodes:
-        for n2 in target_nodes:
-            if graph.has_edge(n1, n2):
-                return True
-    return False
-
-
-def _create_edges_with_existing_connection(
-    partition_map: dict[int, list[Any]], graph: nx.DiGraph, aggregated: nx.DiGraph
-) -> None:
-    """Create edges in aggregated graph where original connections exist."""
-    edge_count = 0
-    for cluster1, cluster2 in itertools.permutations(partition_map.keys(), 2):
-        nodes1 = partition_map[cluster1]
-        nodes2 = partition_map[cluster2]
-
-        if _clusters_connected_directed(graph, nodes1, nodes2):
-            aggregated.add_edge(cluster1, cluster2)
-            edge_count += 1
-
-    log_debug(
-        f"ElectricalTopology (existing): {len(partition_map)} nodes, {edge_count} edges",
-        LogCategory.AGGREGATION,
-    )
-
-
 # ============================================================================
 # NODE PROPERTY STRATEGIES - Statistical aggregation for node properties
 # ============================================================================
+
+
+def _extract_numeric_node_values(
+    graph: nx.DiGraph, nodes: list[Any], property_name: str
+) -> np.ndarray:
+    """
+    Extract numeric values for a property from a list of nodes.
+
+    Uses list comprehension for speed, then converts to NumPy array.
+
+    Returns
+    -------
+        NumPy array of numeric values (may be empty)
+    """
+    values = [
+        graph.nodes[node][property_name]
+        for node in nodes
+        if property_name in graph.nodes[node]
+        and isinstance(graph.nodes[node][property_name], (int, float))
+    ]
+    return np.array(values, dtype=np.float64) if values else np.array([], dtype=np.float64)
 
 
 class SumNodeStrategy(NodePropertyStrategy):
     """Sum numerical properties across nodes in a cluster."""
 
     def aggregate_property(self, graph: nx.DiGraph, nodes: list[Any], property_name: str) -> Any:
-        """Sum property values across nodes."""
+        """Sum property values across nodes using NumPy."""
         try:
-            values = []
-            for node in nodes:
-                if property_name in graph.nodes[node]:
-                    value = graph.nodes[node][property_name]
-                    if isinstance(value, (int, float)):
-                        values.append(value)
-
-            return sum(values) if values else 0
+            values = _extract_numeric_node_values(graph, nodes, property_name)
+            return float(np.sum(values)) if len(values) > 0 else 0.0
         except Exception as e:
             raise AggregationError(
                 f"Failed to sum node property '{property_name}': {e}", strategy="sum"
@@ -174,16 +268,10 @@ class AverageNodeStrategy(NodePropertyStrategy):
     """Average numerical properties across nodes in a cluster."""
 
     def aggregate_property(self, graph: nx.DiGraph, nodes: list[Any], property_name: str) -> Any:
-        """Average property values across nodes."""
+        """Average property values across nodes using NumPy."""
         try:
-            values = []
-            for node in nodes:
-                if property_name in graph.nodes[node]:
-                    value = graph.nodes[node][property_name]
-                    if isinstance(value, (int, float)):
-                        values.append(value)
-
-            return sum(values) / len(values) if values else 0
+            values = _extract_numeric_node_values(graph, nodes, property_name)
+            return float(np.mean(values)) if len(values) > 0 else 0.0
         except Exception as e:
             raise AggregationError(
                 f"Failed to average node property '{property_name}': {e}",
@@ -213,20 +301,34 @@ class FirstNodeStrategy(NodePropertyStrategy):
 # ============================================================================
 
 
+def _extract_numeric_edge_values(
+    original_edges: list[dict[str, Any]], property_name: str
+) -> np.ndarray:
+    """
+    Extract numeric values for a property from a list of edge data dicts.
+
+    Uses list comprehension for speed, then converts to NumPy array.
+
+    Returns
+    -------
+        NumPy array of numeric values (may be empty)
+    """
+    values = [
+        edge_data[property_name]
+        for edge_data in original_edges
+        if property_name in edge_data and isinstance(edge_data[property_name], (int, float))
+    ]
+    return np.array(values, dtype=np.float64) if values else np.array([], dtype=np.float64)
+
+
 class SumEdgeStrategy(EdgePropertyStrategy):
     """Sum numerical properties across edges."""
 
     def aggregate_property(self, original_edges: list[dict[str, Any]], property_name: str) -> Any:
-        """Sum property values across edges."""
+        """Sum property values across edges using NumPy."""
         try:
-            values = []
-            for edge_data in original_edges:
-                if property_name in edge_data:
-                    value = edge_data[property_name]
-                    if isinstance(value, (int, float)):
-                        values.append(value)
-
-            return sum(values) if values else 0
+            values = _extract_numeric_edge_values(original_edges, property_name)
+            return float(np.sum(values)) if len(values) > 0 else 0.0
         except Exception as e:
             raise AggregationError(
                 f"Failed to sum edge property '{property_name}': {e}", strategy="sum"
@@ -237,16 +339,10 @@ class AverageEdgeStrategy(EdgePropertyStrategy):
     """Average numerical properties across edges."""
 
     def aggregate_property(self, original_edges: list[dict[str, Any]], property_name: str) -> Any:
-        """Average property values across edges."""
+        """Average property values across edges using NumPy."""
         try:
-            values = []
-            for edge_data in original_edges:
-                if property_name in edge_data:
-                    value = edge_data[property_name]
-                    if isinstance(value, (int, float)):
-                        values.append(value)
-
-            return sum(values) / len(values) if values else 0
+            values = _extract_numeric_edge_values(original_edges, property_name)
+            return float(np.mean(values)) if len(values) > 0 else 0.0
         except Exception as e:
             raise AggregationError(
                 f"Failed to average edge property '{property_name}': {e}",
@@ -289,41 +385,34 @@ class EquivalentReactanceStrategy(EdgePropertyStrategy):
         """
         Calculate the equivalent reactance for the given parallel edges.
 
+        Uses NumPy for vectorized susceptance calculation.
+
         Returns
         -------
             Equivalent reactance value, or float('inf') if no edges exist
         """
         try:
-            total_susceptance = 0.0
-            has_valid_property = False
-            epsilon = 1e-10  # Numerical tolerance for zero comparison
+            values = _extract_numeric_edge_values(original_edges, property_name)
 
-            for edge_data in original_edges:
-                if property_name in edge_data:
-                    reactance = edge_data[property_name]
-
-                    if isinstance(reactance, (int, float)):
-                        has_valid_property = True
-
-                        if abs(reactance) < epsilon:
-                            # A 0-reactance line (short circuit)
-                            # makes the entire parallel group a short circuit.
-                            return 0.0
-
-                        # Add this line's susceptance (handles negative reactance for capacitive elements)
-                        total_susceptance += 1.0 / reactance
-
-            if not has_valid_property:
-                # No edges had this property - equivalent to open circuit (no connection)
+            if len(values) == 0:
+                # No edges had this property - equivalent to open circuit
                 return float("inf")
+
+            epsilon = 1e-10
+
+            # Check for zero reactance (short circuit)
+            if np.any(np.abs(values) < epsilon):
+                return 0.0
+
+            # Vectorized susceptance calculation: b = 1/x
+            susceptances = 1.0 / values
+            total_susceptance = np.sum(susceptances)
 
             if abs(total_susceptance) < epsilon:
-                # This means all valid edges had infinite reactance (open circuit).
-                # The equivalent is also an open circuit.
                 return float("inf")
 
-            # Return the equivalent reactance
-            return 1.0 / total_susceptance
+            return float(1.0 / total_susceptance)
+
         except Exception as e:
             raise AggregationError(
                 f"Failed to calculate equivalent reactance for '{property_name}': {e}",
