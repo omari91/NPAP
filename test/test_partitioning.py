@@ -242,6 +242,259 @@ class TestGeographicalPartitioning:
         # Same random state should produce same results
         assert partition1 == partition2
 
+    # -------------------------------------------------------------------------
+    # DC-Island Auto-Detection Tests
+    # -------------------------------------------------------------------------
+
+    def test_dc_island_auto_detection(self, geographical_dc_island_graph):
+        """Test that DC islands are automatically detected from graph attributes."""
+        strategy = GeographicalPartitioning(algorithm="kmedoids", distance_metric="euclidean")
+        nodes = list(geographical_dc_island_graph.nodes())
+
+        # Should detect DC island data
+        assert strategy._has_dc_island_data(geographical_dc_island_graph, nodes)
+
+    def test_no_dc_island_detection_without_attribute(self, geographical_cluster_graph):
+        """Test that DC islands are not detected when attribute is missing."""
+        strategy = GeographicalPartitioning(algorithm="kmedoids", distance_metric="euclidean")
+        nodes = list(geographical_cluster_graph.nodes())
+
+        # Should NOT detect DC island data (no dc_island attribute)
+        assert not strategy._has_dc_island_data(geographical_cluster_graph, nodes)
+
+    def test_dc_island_awareness_support_kmedoids(self):
+        """Test that kmedoids supports DC-island awareness."""
+        strategy = GeographicalPartitioning(algorithm="kmedoids")
+        config = GeographicalConfig()
+        assert strategy._supports_dc_island_awareness(config)
+
+    def test_dc_island_awareness_support_dbscan(self):
+        """Test that dbscan supports DC-island awareness."""
+        strategy = GeographicalPartitioning(algorithm="dbscan")
+        config = GeographicalConfig()
+        assert strategy._supports_dc_island_awareness(config)
+
+    def test_dc_island_awareness_support_hdbscan(self):
+        """Test that hdbscan supports DC-island awareness."""
+        strategy = GeographicalPartitioning(algorithm="hdbscan")
+        config = GeographicalConfig()
+        assert strategy._supports_dc_island_awareness(config)
+
+    def test_dc_island_awareness_support_hierarchical_non_ward(self):
+        """Test that hierarchical with non-ward linkage supports DC-island awareness."""
+        strategy = GeographicalPartitioning(algorithm="hierarchical")
+        config = GeographicalConfig(hierarchical_linkage="complete")
+        assert strategy._supports_dc_island_awareness(config)
+
+    def test_dc_island_awareness_no_support_kmeans(self):
+        """Test that kmeans does not support DC-island awareness."""
+        strategy = GeographicalPartitioning(algorithm="kmeans")
+        config = GeographicalConfig()
+        assert not strategy._supports_dc_island_awareness(config)
+
+    def test_dc_island_awareness_no_support_hierarchical_ward(self):
+        """Test that hierarchical with ward linkage does not support DC-island awareness."""
+        strategy = GeographicalPartitioning(algorithm="hierarchical")
+        config = GeographicalConfig(hierarchical_linkage="ward")
+        assert not strategy._supports_dc_island_awareness(config)
+
+    # -------------------------------------------------------------------------
+    # DC-Island Aware Partitioning Tests (Supported Algorithms)
+    # -------------------------------------------------------------------------
+
+    def test_kmedoids_respects_dc_island_boundaries(self, geographical_dc_island_graph):
+        """Test K-Medoids respects DC island boundaries when detected."""
+        strategy = GeographicalPartitioning(algorithm="kmedoids", distance_metric="euclidean")
+        partition = strategy.partition(geographical_dc_island_graph, n_clusters=2)
+
+        # Nodes 0,1,2 are in DC island 0
+        # Nodes 3,4,5 are in DC island 1
+        # They should NEVER be in the same cluster
+        for i in [0, 1, 2]:
+            for j in [3, 4, 5]:
+                assert nodes_in_different_clusters(partition, i, j), (
+                    f"Nodes {i} and {j} should be in different clusters (different DC islands)"
+                )
+
+    def test_kmedoids_haversine_respects_dc_island_boundaries(self, geographical_dc_island_graph):
+        """Test K-Medoids with haversine respects DC island boundaries."""
+        strategy = GeographicalPartitioning(algorithm="kmedoids", distance_metric="haversine")
+        partition = strategy.partition(geographical_dc_island_graph, n_clusters=2)
+
+        for i in [0, 1, 2]:
+            for j in [3, 4, 5]:
+                assert nodes_in_different_clusters(partition, i, j)
+
+    def test_dbscan_respects_dc_island_boundaries(self, geographical_dc_island_graph):
+        """Test DBSCAN respects DC island boundaries when detected."""
+        strategy = GeographicalPartitioning(algorithm="dbscan", distance_metric="euclidean")
+        partition = strategy.partition(geographical_dc_island_graph, eps=1.0, min_samples=2)
+
+        # Verify nodes from different DC islands are not in the same cluster
+        for i in [0, 1, 2]:
+            for j in [3, 4, 5]:
+                assert nodes_in_different_clusters(partition, i, j)
+
+    def test_hdbscan_respects_dc_island_boundaries(self, geographical_dc_island_graph):
+        """Test HDBSCAN respects DC island boundaries when detected."""
+        strategy = GeographicalPartitioning(algorithm="hdbscan", distance_metric="euclidean")
+        partition = strategy.partition(geographical_dc_island_graph, min_cluster_size=2)
+
+        for i in [0, 1, 2]:
+            for j in [3, 4, 5]:
+                assert nodes_in_different_clusters(partition, i, j)
+
+    def test_hierarchical_complete_respects_dc_island_boundaries(
+        self, geographical_dc_island_graph
+    ):
+        """Test hierarchical clustering with complete linkage respects DC island boundaries."""
+        config = GeographicalConfig(hierarchical_linkage="complete")
+        strategy = GeographicalPartitioning(
+            algorithm="hierarchical", distance_metric="euclidean", config=config
+        )
+        partition = strategy.partition(geographical_dc_island_graph, n_clusters=2)
+
+        for i in [0, 1, 2]:
+            for j in [3, 4, 5]:
+                assert nodes_in_different_clusters(partition, i, j)
+
+    def test_hierarchical_average_respects_dc_island_boundaries(self, geographical_dc_island_graph):
+        """Test hierarchical clustering with average linkage respects DC island boundaries."""
+        config = GeographicalConfig(hierarchical_linkage="average")
+        strategy = GeographicalPartitioning(
+            algorithm="hierarchical", distance_metric="euclidean", config=config
+        )
+        partition = strategy.partition(geographical_dc_island_graph, n_clusters=2)
+
+        for i in [0, 1, 2]:
+            for j in [3, 4, 5]:
+                assert nodes_in_different_clusters(partition, i, j)
+
+    def test_dc_island_aware_with_more_clusters(self, geographical_dc_island_graph):
+        """Test DC island awareness with more clusters than islands."""
+        strategy = GeographicalPartitioning(algorithm="kmedoids", distance_metric="euclidean")
+        partition = strategy.partition(geographical_dc_island_graph, n_clusters=4)
+
+        assert all_nodes_assigned(partition, list(geographical_dc_island_graph.nodes()))
+        assert len(partition) == 4
+
+        # DC island boundaries should still be respected
+        for i in [0, 1, 2]:
+            for j in [3, 4, 5]:
+                assert nodes_in_different_clusters(partition, i, j)
+
+    # -------------------------------------------------------------------------
+    # DC-Island Warning Tests (Unsupported Algorithms)
+    # -------------------------------------------------------------------------
+
+    def test_kmeans_warns_with_dc_islands(self, geographical_dc_island_graph):
+        """Test K-Means issues warning when DC islands are detected."""
+        strategy = GeographicalPartitioning(algorithm="kmeans", distance_metric="euclidean")
+
+        with pytest.warns(UserWarning, match="DC islands detected.*does not support"):
+            partition = strategy.partition(geographical_dc_island_graph, n_clusters=2)
+
+        # Should still produce valid partition (just without DC-island awareness)
+        assert all_nodes_assigned(partition, list(geographical_dc_island_graph.nodes()))
+
+    def test_hierarchical_ward_warns_with_dc_islands(self, geographical_dc_island_graph):
+        """Test hierarchical with ward linkage issues warning when DC islands are detected."""
+        config = GeographicalConfig(hierarchical_linkage="ward")
+        strategy = GeographicalPartitioning(
+            algorithm="hierarchical", distance_metric="euclidean", config=config
+        )
+
+        with pytest.warns(UserWarning, match="DC islands detected.*does not support"):
+            partition = strategy.partition(geographical_dc_island_graph, n_clusters=2)
+
+        # Should still produce valid partition
+        assert all_nodes_assigned(partition, list(geographical_dc_island_graph.nodes()))
+
+    # -------------------------------------------------------------------------
+    # DC-Island Distance Matrix Tests
+    # -------------------------------------------------------------------------
+
+    def test_dc_island_aware_distance_matrix(self, geographical_dc_island_graph):
+        """Test that DC-island-aware distance matrix assigns infinite distance between islands."""
+
+        strategy = GeographicalPartitioning(algorithm="kmedoids", distance_metric="euclidean")
+        nodes = list(geographical_dc_island_graph.nodes())
+        coordinates = strategy._extract_coordinates(geographical_dc_island_graph, nodes)
+        dc_islands = strategy._extract_dc_islands(geographical_dc_island_graph, nodes)
+        config = GeographicalConfig(infinite_distance=1e4)
+
+        distance_matrix = strategy._build_dc_island_aware_distance_matrix(
+            coordinates, dc_islands, config
+        )
+
+        # Nodes in same DC island should have finite distances
+        # Nodes 0,1,2 are in island 0
+        assert distance_matrix[0, 1] < config.infinite_distance
+        assert distance_matrix[1, 2] < config.infinite_distance
+
+        # Nodes 3,4,5 are in island 1
+        assert distance_matrix[3, 4] < config.infinite_distance
+        assert distance_matrix[4, 5] < config.infinite_distance
+
+        # Nodes in different DC islands should have infinite distance
+        assert distance_matrix[0, 3] == config.infinite_distance
+        assert distance_matrix[1, 4] == config.infinite_distance
+        assert distance_matrix[2, 5] == config.infinite_distance
+
+        # Diagonal should be zero
+        for i in range(len(nodes)):
+            assert distance_matrix[i, i] == 0.0
+
+    def test_infinite_distance_config_override(self, geographical_dc_island_graph):
+        """Test that infinite_distance can be configured."""
+
+        strategy = GeographicalPartitioning(algorithm="kmedoids", distance_metric="euclidean")
+        nodes = list(geographical_dc_island_graph.nodes())
+        coordinates = strategy._extract_coordinates(geographical_dc_island_graph, nodes)
+        dc_islands = strategy._extract_dc_islands(geographical_dc_island_graph, nodes)
+
+        # Use custom infinite distance
+        config = GeographicalConfig(infinite_distance=999.0)
+        distance_matrix = strategy._build_dc_island_aware_distance_matrix(
+            coordinates, dc_islands, config
+        )
+
+        # Cross-island distances should use the custom infinite distance
+        assert distance_matrix[0, 3] == 999.0
+
+    # -------------------------------------------------------------------------
+    # DC-Island Consistency Validation Tests
+    # -------------------------------------------------------------------------
+
+    def test_cluster_dc_island_consistency_valid(self, geographical_dc_island_graph):
+        """Test consistency validation passes for valid partitions."""
+        strategy = GeographicalPartitioning(algorithm="kmedoids")
+
+        # Valid partition: each cluster contains nodes from only one DC island
+        valid_partition = {0: [0, 1, 2], 1: [3, 4, 5]}
+
+        # Should not raise or warn
+        strategy._validate_cluster_dc_island_consistency(
+            geographical_dc_island_graph, valid_partition
+        )
+
+    def test_cluster_dc_island_consistency_warning(self, geographical_dc_island_graph, caplog):
+        """Test consistency validation warns for invalid partitions."""
+        import logging
+
+        strategy = GeographicalPartitioning(algorithm="kmedoids")
+
+        # Invalid partition: cluster 0 mixes nodes from different DC islands
+        invalid_partition = {0: [0, 1, 3], 1: [2, 4, 5]}
+
+        with caplog.at_level(logging.WARNING):
+            strategy._validate_cluster_dc_island_consistency(
+                geographical_dc_island_graph, invalid_partition
+            )
+
+        # Should have logged a warning about mixed DC islands
+        assert "multiple DC islands" in caplog.text
+
 
 # =============================================================================
 # ELECTRICAL DISTANCE PARTITIONING TESTS
