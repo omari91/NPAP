@@ -21,3 +21,25 @@ npap.egg-info
 test/coverage_annotated
 test/htmlcov
 .coverage
+# pytest cache
+.pytest_cache/
+
+# mypy cache
+.mypy_cache/
+
+# ruff cache
+.ruff_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+*~
+.vscode/
+
+# Claude files
+CLAUDE.md
+.claude/
