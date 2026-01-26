@@ -25,3 +25,7 @@ Voltage-Aware Partitioning
 .. automodule:: npap.partitioning.va_geographical
    :members:
    :show-inheritance:
+
+.. automodule:: npap.partitioning.va_electrical
+   :members:
+   :show-inheritance:
