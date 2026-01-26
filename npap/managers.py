@@ -936,6 +936,7 @@ class PartitionAggregatorManager:
         style: str = "simple",
         graph: nx.DiGraph = None,
         show: bool = True,
+        config=None,
         **kwargs,
     ):
         """
@@ -950,6 +951,8 @@ class PartitionAggregatorManager:
                                prior partitioning)
             graph: Optional graph to plot (uses current graph if not provided)
             show: Whether to display immediately (default: True)
+            config: Optional PlotConfig instance to override defaults. If provided,
+                   kwargs will further override values from this config.
             **kwargs: Additional configuration options:
                 - show_lines: bool = True
                 - show_trafos: bool = True
@@ -995,6 +998,7 @@ class PartitionAggregatorManager:
             style=style,
             partition_map=partition_map,
             show=show,
+            config=config,
             **kwargs,
         )
 

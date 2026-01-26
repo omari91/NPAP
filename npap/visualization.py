@@ -662,6 +662,7 @@ def plot_network(
     style: str = "simple",
     partition_map: dict[int, list[Any]] | None = None,
     show: bool = True,
+    config: PlotConfig | None = None,
     **kwargs,
 ) -> go.Figure:
     """
@@ -675,7 +676,10 @@ def plot_network(
         style: Visualization style ('simple', 'voltage_aware', or 'clustered')
         partition_map: Optional cluster mapping for 'clustered' style
         show: Whether to display the figure immediately
-        **kwargs: Additional configuration parameters passed to PlotConfig
+        config: Optional PlotConfig instance to override defaults. If provided,
+               kwargs will further override values from this config.
+        **kwargs: Additional configuration parameters passed to PlotConfig.
+                 These override both defaults and any provided config values.
 
     Returns
     -------
@@ -685,16 +689,25 @@ def plot_network(
     ------
         ValueError: If style is unknown or prerequisites are missing
     """
-    config = PlotConfig(**kwargs)
+    if config is not None:
+        # Start with provided config, then override with kwargs
+        from dataclasses import asdict
+
+        config_dict = asdict(config)
+        config_dict.update(kwargs)
+        effective_config = PlotConfig(**config_dict)
+    else:
+        effective_config = PlotConfig(**kwargs)
+
     plotter = NetworkPlotter(graph, partition_map=partition_map)
 
     # Support both string and enum style specifications
     if style == "simple" or style == PlotStyle.SIMPLE:
-        return plotter.plot_simple(config, show=show)
+        return plotter.plot_simple(effective_config, show=show)
     elif style == "voltage_aware" or style == PlotStyle.VOLTAGE_AWARE:
-        return plotter.plot_voltage_aware(config, show=show)
+        return plotter.plot_voltage_aware(effective_config, show=show)
     elif style == "clustered" or style == PlotStyle.CLUSTERED:
-        return plotter.plot_clustered(config, show=show)
+        return plotter.plot_clustered(effective_config, show=show)
     else:
         raise ValueError(
             f"Unknown plot style: {style}. Valid options: 'simple', 'voltage_aware', 'clustered'"
