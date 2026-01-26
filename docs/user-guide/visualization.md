@@ -93,14 +93,14 @@ config = PlotConfig(
     show_nodes=True,
 
     # Voltage threshold (kV)
-    voltage_threshold=300,
+    line_voltage_threshold=300,
 
     # Colors (hex)
-    high_voltage_color="#e74c3c",   # Red for HV
-    low_voltage_color="#3498db",    # Blue for LV
-    trafo_color="#9b59b6",          # Purple for transformers
-    dc_link_color="#2ecc71",        # Green for DC links
-    node_color="#34495e",           # Dark gray for nodes
+    line_high_voltage_color="#e74c3c",   # Red for HV
+    line_low_voltage_color="#3498db",    # Blue for LV
+    trafo_color="#9b59b6",               # Purple for transformers
+    dc_link_color="#2ecc71",             # Green for DC links
+    node_color="#34495e",                # Dark gray for nodes
 
     # Geometry
     edge_width=1.5,
@@ -223,7 +223,7 @@ import plotly.graph_objects as go
 fig = manager.plot_network(style="simple", show=False)
 
 # Add custom markers
-fig.add_trace(go.Scattergeo(
+fig.add_trace(go.Scattermapbox(
     lat=[47.0, 47.5],
     lon=[15.0, 15.5],
     mode="markers",
