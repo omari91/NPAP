@@ -47,8 +47,8 @@ graph = manager.load_data(
     node_file="buses.csv",           # Bus/substation data
     line_file="lines.csv",           # AC transmission lines
     transformer_file="transformers.csv",  # Transformers between voltage levels
-    converter_file="converters.csv", # AC/DC converters (optional)
-    link_file="dc_links.csv"         # HVDC links (optional)
+    converter_file="converters.csv", # AC/DC converters
+    link_file="dc_links.csv"         # HVDC links
 )
 
 print(f"Loaded network: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")

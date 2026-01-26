@@ -143,8 +143,8 @@ graph = manager.load_data(
     node_file="buses.csv",
     line_file="lines.csv",
     transformer_file="transformers.csv",
-    converter_file="converters.csv",  # Optional
-    link_file="dc_links.csv"          # Optional
+    converter_file="converters.csv",
+    link_file="dc_links.csv"
 )
 ```
 
@@ -155,8 +155,8 @@ graph = manager.load_data(
 | `node_file` | str | *required* | Path to buses/substations CSV |
 | `line_file` | str | *required* | Path to AC transmission lines CSV |
 | `transformer_file` | str | *required* | Path to transformers CSV |
-| `converter_file` | str | `None` | Path to AC/DC converters CSV |
-| `link_file` | str | `None` | Path to DC links CSV |
+| `converter_file` | str | *required* | Path to AC/DC converters CSV |
+| `link_file` | str | *required* | Path to DC links CSV |
 
 ### File Formats
 
