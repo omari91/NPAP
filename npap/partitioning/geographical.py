@@ -94,11 +94,11 @@ class GeographicalPartitioning(PartitioningStrategy):
     }
 
     def __init__(
-        self,
-        algorithm: str = "kmeans",
-        distance_metric: str = "euclidean",
-        dc_island_attr: str = "dc_island",
-        config: GeographicalConfig | None = None,
+            self,
+            algorithm: str = "kmeans",
+            distance_metric: str = "euclidean",
+            dc_island_attr: str = "dc_island",
+            config: GeographicalConfig | None = None,
     ):
         """
         Initialize geographical partitioning strategy.
@@ -300,7 +300,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         return np.array(coordinates)
 
     def _run_clustering(
-        self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
+            self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
     ) -> np.ndarray:
         """Dispatch to appropriate clustering algorithm."""
         if self.algorithm == "kmeans":
@@ -320,7 +320,7 @@ class GeographicalPartitioning(PartitioningStrategy):
             )
 
     def _kmeans_clustering(
-        self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
+            self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
     ) -> np.ndarray:
         """Perform K-means clustering on geographical coordinates."""
         # K-means requires Euclidean distance
@@ -338,13 +338,15 @@ class GeographicalPartitioning(PartitioningStrategy):
                 strategy=self._get_strategy_name(),
             )
 
+        cartesian_coordinates = self._convert_spherical_to_cartesian(coordinates)
+
         log_debug(f"Running K-means with {n_clusters} clusters", LogCategory.PARTITIONING)
         return run_kmeans(
-            coordinates, n_clusters, config.random_state, config.max_iter, config.n_init
+            cartesian_coordinates, n_clusters, config.random_state, config.max_iter, config.n_init
         )
 
     def _kmedoids_clustering(
-        self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
+            self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
     ) -> np.ndarray:
         """Perform K-medoids clustering on geographical coordinates."""
         n_clusters = kwargs.get("n_clusters")
@@ -375,7 +377,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         return run_kmedoids(distance_matrix, n_clusters)
 
     def _dbscan_clustering(
-        self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
+            self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
     ) -> np.ndarray:
         """Perform DBSCAN clustering on geographical coordinates."""
         eps = kwargs.get("eps")
@@ -407,7 +409,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         return run_dbscan(distance_matrix, eps, min_samples)
 
     def _hierarchical_clustering(
-        self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
+            self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
     ) -> np.ndarray:
         """Perform Hierarchical Clustering on geographical coordinates."""
         n_clusters = kwargs.get("n_clusters")
@@ -461,7 +463,7 @@ class GeographicalPartitioning(PartitioningStrategy):
             return run_hierarchical(distance_matrix, n_clusters, linkage)
 
     def _hdbscan_clustering(
-        self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
+            self, coordinates: np.ndarray, config: GeographicalConfig, **kwargs
     ) -> np.ndarray:
         """Perform HDBSCAN clustering on geographical coordinates."""
         min_cluster_size = kwargs.get("min_cluster_size", 5)
@@ -551,10 +553,10 @@ class GeographicalPartitioning(PartitioningStrategy):
         return np.array(dc_islands)
 
     def _build_dc_island_aware_distance_matrix(
-        self,
-        coordinates: np.ndarray,
-        dc_islands: np.ndarray,
-        config: GeographicalConfig,
+            self,
+            coordinates: np.ndarray,
+            dc_islands: np.ndarray,
+            config: GeographicalConfig,
     ) -> np.ndarray:
         """
         Build distance matrix with DC island awareness.
@@ -601,7 +603,7 @@ class GeographicalPartitioning(PartitioningStrategy):
 
     @staticmethod
     def _validate_cluster_dc_island_consistency(
-        graph: nx.Graph, partition_map: dict[int, list[Any]]
+            graph: nx.Graph, partition_map: dict[int, list[Any]]
     ) -> None:
         """
         Validate that clusters don't mix different DC islands.
@@ -628,3 +630,35 @@ class GeographicalPartitioning(PartitioningStrategy):
                     LogCategory.PARTITIONING,
                     warn_user=False,
                 )
+
+    @staticmethod
+    def _convert_spherical_to_cartesian(coordinates: np.ndarray) -> np.ndarray:
+        """
+        Convert spherical coordinates (lat, lon) to Cartesian (x, y, z).
+
+        This is used for K-means clustering which operates in Euclidean space.
+
+        Args:
+            coordinates: Array of [lat, lon] in degrees (n x 2)
+
+        Returns
+        -------
+            Array of [x, y, z] Cartesian coordinates (n x 3)
+        """
+
+        coords = np.asarray(coordinates)
+        if coords.ndim != 2 or coords.shape[1] != 2:
+            raise PartitioningError(
+                "Coordinates must be a (n, 2) array of [lat, lon] pairs.",
+                strategy="geographical_conversion",
+            )
+
+        lat_rad = np.radians(coords[:, 0])
+        lon_rad = np.radians(coords[:, 1])
+
+        cos_lat = np.cos(lat_rad)
+        x = cos_lat * np.cos(lon_rad)
+        y = cos_lat * np.sin(lon_rad)
+        z = np.sin(lat_rad)
+
+        return np.column_stack((x, y, z))
