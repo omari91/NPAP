@@ -8,6 +8,7 @@ Tests cover:
 """
 
 import networkx as nx
+import numpy as np
 import pytest
 
 from npap.exceptions import PartitioningError, ValidationError
@@ -25,6 +26,7 @@ from test.conftest import (
     nodes_in_different_clusters,
     nodes_in_same_cluster,
 )
+
 
 # =============================================================================
 # GEOGRAPHICAL PARTITIONING TESTS
@@ -345,7 +347,7 @@ class TestGeographicalPartitioning:
                 assert nodes_in_different_clusters(partition, i, j)
 
     def test_hierarchical_complete_respects_dc_island_boundaries(
-        self, geographical_dc_island_graph
+            self, geographical_dc_island_graph
     ):
         """Test hierarchical clustering with complete linkage respects DC island boundaries."""
         config = GeographicalConfig(hierarchical_linkage="complete")
@@ -494,6 +496,72 @@ class TestGeographicalPartitioning:
 
         # Should have logged a warning about mixed DC islands
         assert "multiple DC islands" in caplog.text
+
+    # -------------------------------------------------------------------------
+    # Spherical to Cartesian Conversion Tests
+    # -------------------------------------------------------------------------
+
+    def test_convert_spherical_to_cartesian(self):
+        """
+        Test conversion from spherical (lat, lon) to Cartesian coordinates.
+
+        The function assumes a unit radius (1.0). Therefore, a "zero radius"
+        test case is not applicable to the current implementation.
+        """
+        strategy = GeographicalPartitioning()
+
+        # Test case 1: Equator at (0, 0) -> (x=1, y=0, z=0)
+        coords1 = np.array([[0.0, 0.0]])
+        expected1 = np.array([[1.0, 0.0, 0.0]])
+        np.testing.assert_allclose(
+            strategy._convert_spherical_to_cartesian(coords1), expected1, atol=1e-7
+        )
+
+        # Test case 2: Equator at (0, 90) -> (x=0, y=1, z=0)
+        coords2 = np.array([[0.0, 90.0]])
+        expected2 = np.array([[0.0, 1.0, 0.0]])
+        np.testing.assert_allclose(
+            strategy._convert_spherical_to_cartesian(coords2), expected2, atol=1e-7
+        )
+
+        # Test case 3: North Pole (lat=90) -> (x=0, y=0, z=1)
+        coords3 = np.array([[90.0, 0.0]])
+        expected3 = np.array([[0.0, 0.0, 1.0]])
+        np.testing.assert_allclose(
+            strategy._convert_spherical_to_cartesian(coords3), expected3, atol=1e-7
+        )
+
+        # Test case 4: South Pole (lat=-90) -> (x=0, y=0, z=-1)
+        coords4 = np.array([[-90.0, 45.0]])
+        expected4 = np.array([[0.0, 0.0, -1.0]])
+        np.testing.assert_allclose(
+            strategy._convert_spherical_to_cartesian(coords4), expected4, atol=1e-7
+        )
+
+        # Test case 5: Multiple points at once
+        coords_multi = np.array([[0.0, 0.0], [90.0, 0.0], [0.0, 90.0]])
+        expected_multi = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
+        np.testing.assert_allclose(
+            strategy._convert_spherical_to_cartesian(coords_multi),
+            expected_multi,
+            atol=1e-7,
+        )
+
+        # Test case 6: 45 degrees lat/lon
+        # x = cos(45)*cos(45) = 0.5
+        # y = cos(45)*sin(45) = 0.5
+        # z = sin(45) = sqrt(2)/2
+        sqrt2_2 = np.sqrt(2) / 2
+        coords6 = np.array([[45.0, 45.0]])
+        expected6 = np.array([[0.5, 0.5, sqrt2_2]])
+        np.testing.assert_allclose(
+            strategy._convert_spherical_to_cartesian(coords6), expected6, atol=1e-7
+        )
+
+        # Edge case: Invalid input shape should raise PartitioningError
+        # The function expects a 2D array (n, 2)
+        with pytest.raises(PartitioningError):
+            strategy._convert_spherical_to_cartesian(np.array([1.0, 2.0]))
 
 
 # =============================================================================
@@ -650,8 +718,8 @@ class TestElectricalDistancePartitioning:
         strategy = ElectricalDistancePartitioning()
 
         with pytest.raises(
-            PartitioningError,
-            match="Cannot compute electrical distances without AC connectivity",
+                PartitioningError,
+                match="Cannot compute electrical distances without AC connectivity",
         ):
             strategy.partition(G, n_clusters=1)
 
