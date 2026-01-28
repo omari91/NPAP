@@ -4,12 +4,12 @@ Partitioning divides a network into clusters of nodes based on distance metrics.
 
 ## Overview
 
-| Strategy Family | Distance Metric      | Use Case |
-|-----------------|----------------------|----------|
-| Geographic | Euclidean / Haversine | Spatial proximity clustering |
-| Electrical | PTDF-based           | Electrical behavior clustering |
-| VA Geographic | Geographic + Voltage | Multi-voltage networks |
-| VA Electrical | PTDF + Voltage aware | Multi-voltage electrical clustering |
+| Strategy Family | Distance Metric            | Use Case                                  |
+|-----------------|----------------------------|-------------------------------------------|
+| Geographic | Euclidean / Haversine      | Spatial proximity clustering              |
+| Electrical | PTDF-based                 | Electrical behavior clustering            |
+| VA Geographic | Geographic + Voltage aware | Multi-voltage-level networks              |
+| VA Electrical | PTDF + Voltage aware       | Multi-voltage-level electrical clustering |
 
 ## Basic Usage
 
@@ -181,18 +181,18 @@ Clusters nodes based on **electrical distance** computed from Power Transfer Dis
 Electrical distance is based on how power flows through the network:
 
 1. **Incidence Matrix (K)**: Describes network topology
-2. **Susceptance Matrix (B)**: $B = K_{sba}^T \cdot \text{diag}(b) \cdot K_{sba}$
-3. **PTDF Matrix**: $PTDF = \text{diag}(b) \cdot K_{sba} \cdot B^{-1}$
-4. **Electrical Distance**: $d_{ij} = ||PTDF_{:,i} - PTDF_{:,j}||_2$
+2. **Susceptance Matrix (B)**: $\mathbf{B} = \mathbf{K}_\mathrm{sba}^\top \cdot \text{diag}(\mathbf{b}) \cdot \mathbf{K}_\mathrm{sba}$
+3. **PTDF Matrix**: $\mathbf{PTDF} = \text{diag}(\mathrm{b}) \cdot \mathbf{K}_\mathrm{sba} \cdot \mathbf{B}^{-1}$
+4. **Electrical Distance**: $d_{ij} = ||\mathrm{PTDF}_{:,i} - \mathrm{PTDF}_{:,j}||_2$
 
-Nodes with similar PTDF columns have similar electrical behavior.
+Nodes with similar PTDF columns have similar impact on power flows of lines.
 
 ### Available Strategies
 
-| Strategy | Algorithm | Description |
-|----------|-----------|-------------|
-| `electrical_kmeans` | K-Means | Fast electrical clustering |
-| `electrical_kmedoids` | K-Medoids | Robust electrical clustering |
+| Strategy | Algorithm | Description                                                                |
+|----------|-----------|----------------------------------------------------------------------------|
+| `electrical_kmeans` | K-Means | Electrical clustering with arbitrary node as centroid                      |
+| `electrical_kmedoids` | K-Medoids | Electrical clustering with existing node as centroid (e.g. Kron-Reduction) |
 
 ### Basic Usage
 
@@ -412,9 +412,7 @@ flowchart TD
     D -->|Yes| G[electrical_*]
     D -->|No| H{DC islands?}
     H -->|Yes| I[geographical_kmedoids_*]
-    H -->|No| J{Fast or robust?}
-    J -->|Fast| K[geographical_kmeans]
-    J -->|Robust| L[geographical_kmedoids_*]
+    H -->|No| K[geographical_kmeans]
 
     style A fill:#2993B5,stroke:#1d6f8a,color:#fff
     style B fill:#FFBF00,stroke:#cc9900,color:#1e293b
@@ -425,21 +423,18 @@ flowchart TD
     style G fill:#0fad6b,stroke:#076b3f,color:#fff
     style H fill:#FFBF00,stroke:#cc9900,color:#1e293b
     style I fill:#0fad6b,stroke:#076b3f,color:#fff
-    style J fill:#FFBF00,stroke:#cc9900,color:#1e293b
     style K fill:#0fad6b,stroke:#076b3f,color:#fff
-    style L fill:#0fad6b,stroke:#076b3f,color:#fff
 ```
 
 ### Recommendations by Use Case
 
-| Use Case | Recommended Strategy |
-|----------|---------------------|
-| Quick geographic clustering | `geographical_kmeans` |
-| Geographic with DC islands | `geographical_kmedoids_haversine` |
+| Use Case                     | Recommended Strategy |
+|------------------------------|---------------------|
+| Geographic clustering        | `geographical_kmeans` |
+| Geographic with DC islands   | `geographical_kmedoids_haversine` |
 | Electrical behavior grouping | `electrical_kmedoids` |
-| Multi-voltage network | `va_geographical_kmedoids_haversine` |
-| Unknown cluster count | `geographical_dbscan_*` or `geographical_hdbscan_*` |
-| Large networks (>10k nodes) | `geographical_kmeans` |
+| Multi-voltage network        | `va_geographical_kmedoids_haversine` |
+| Unknown cluster count        | `geographical_dbscan_*` or `geographical_hdbscan_*` |
 
 ### Performance Comparison
 
