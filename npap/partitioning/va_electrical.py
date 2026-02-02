@@ -58,8 +58,10 @@ class VAElectricalDistancePartitioning(PartitioningStrategy):
     over the complete AC network (lines AND transformers), while enforcing
     voltage level boundaries as hard clustering constraints via post-processing.
 
-    Physical Rationale
-    ------------------
+    Notes
+    -----
+    **Physical Rationale**
+
     In power systems, PTDF (Power Transfer Distribution Factor) describes how
     power injections affect line flows within an AC network. This strategy:
 
@@ -72,33 +74,36 @@ class VAElectricalDistancePartitioning(PartitioningStrategy):
        infinite distance, preserving voltage hierarchy in the partitioning.
 
     This approach is physically meaningful because:
+
     - The full PTDF captures how power flows through the entire AC network
     - Voltage level boundaries are then enforced as hard clustering constraints
     - Transformers become inter-cluster edges after aggregation
 
-    Constraint Hierarchy
-    --------------------
+    **Constraint Hierarchy**
+
     1. DC Islands: Nodes in different DC islands have infinite distance
        (computed via separate PTDF matrices).
     2. Voltage Levels: Nodes at different voltage levels have infinite distance
        (enforced via post-processing).
 
-    Algorithm
-    ---------
+    **Algorithm**
+
     1. Group nodes by DC island
     2. For each DC island:
+
        a. Extract full AC subgraph (lines + transformers, exclude DC links)
        b. Select ONE slack bus for the entire DC island
        c. Compute PTDF including ALL AC elements
        d. Calculate electrical distances from PTDF columns
+
     3. Combine into full distance matrix with infinite inter-island distances
     4. Post-process: Set infinite distance for node pairs at different voltage levels
     5. Run clustering algorithm on the distance matrix
 
-    Supported Algorithms
-    --------------------
-    - 'kmedoids': K-Medoids clustering (works with precomputed distance matrices)
-    - 'hierarchical': Agglomerative clustering with precomputed distances
+    **Supported Algorithms**
+
+    - ``kmedoids``: K-Medoids clustering (works with precomputed distance matrices)
+    - ``hierarchical``: Agglomerative clustering with precomputed distances
 
     See Also
     --------
@@ -201,13 +206,12 @@ class VAElectricalDistancePartitioning(PartitioningStrategy):
             NetworkX DiGraph with voltage and dc_island on nodes,
             reactance on AC edges (lines and transformers).
         **kwargs : dict
-            Additional parameters:
-            - n_clusters : int
-                Number of clusters (required).
-            - config : VAElectricalConfig, optional
-                Override instance config.
-            - hierarchical_linkage : str, optional
-                Override linkage for hierarchical clustering.
+            Additional parameters including:
+
+            - ``n_clusters`` (int): Number of clusters (required).
+            - ``config`` (VAElectricalConfig, optional): Override instance config.
+            - ``hierarchical_linkage`` (str, optional): Override linkage for
+              hierarchical clustering.
             - Individual config parameters to override.
 
         Returns

@@ -56,7 +56,10 @@ class VAGeographicalPartitioning(PartitioningStrategy):
     This strategy partitions nodes based on geographical distance while
     respecting both DC island boundaries and voltage level boundaries.
 
-    Constraint Hierarchy:
+    Notes
+    -----
+    **Constraint Hierarchy**
+
     1. DC Islands: Nodes in different DC islands are assigned infinite distance.
        DC islands represent separate AC networks connected only via DC links.
     2. Voltage Levels: Within each DC island, nodes at different voltage levels
@@ -65,28 +68,36 @@ class VAGeographicalPartitioning(PartitioningStrategy):
     This ensures clustering only occurs within the same DC island AND
     the same voltage level, which is physically meaningful for power networks.
 
+    **Clustering Modes**
+
     Two clustering modes are available:
 
-    Standard mode (default):
-        - Builds full NxN distance matrix
-        - Sets d(i,j) = inf if dc_island(i) != dc_island(j) OR voltage(i) != voltage(j)
-        - Runs single clustering algorithm on entire matrix
-        - Algorithm handles infinite distances to respect boundaries
+    *Standard mode* (default):
 
-    Proportional mode:
-        - Groups nodes by (dc_island, voltage_level) combination
-        - Distributes n_clusters proportionally among groups
-        - Runs clustering independently on each group
-        - Guaranteed balanced distribution per group
+    - Builds full NxN distance matrix
+    - Sets d(i,j) = inf if dc_island(i) != dc_island(j) OR voltage(i) != voltage(j)
+    - Runs single clustering algorithm on entire matrix
+    - Algorithm handles infinite distances to respect boundaries
 
-    Supported algorithms:
-        - 'kmedoids': K-Medoids clustering (works naturally with precomputed distances)
-        - 'hierarchical': Agglomerative clustering with precomputed distances
-                         (uses 'complete' linkage by default, configurable)
+    *Proportional mode*:
+
+    - Groups nodes by (dc_island, voltage_level) combination
+    - Distributes n_clusters proportionally among groups
+    - Runs clustering independently on each group
+    - Guaranteed balanced distribution per group
+
+    **Supported Algorithms**
+
+    - ``kmedoids``: K-Medoids clustering (works naturally with precomputed distances)
+    - ``hierarchical``: Agglomerative clustering with precomputed distances
+      (uses 'complete' linkage by default, configurable)
+
+    **Configuration**
 
     Configuration can be provided at:
-    - Instantiation time (via `config` parameter in __init__)
-    - Partition time (via `config` or individual parameters in partition())
+
+    - Instantiation time (via ``config`` parameter in __init__)
+    - Partition time (via ``config`` or individual parameters in partition())
 
     Partition-time parameters override instance defaults for that call only.
     """
