@@ -122,7 +122,7 @@ manager.plot_network(
 
 ### buses.csv (Nodes)
 
-```csv
+```text
 id,lat,lon,voltage,p_load,q_load
 bus_001,47.0667,15.4333,380,100.0,30.0
 bus_002,47.1234,15.5678,380,150.0,45.0
@@ -131,7 +131,7 @@ bus_003,48.2089,16.3726,220,200.0,60.0
 
 ### lines.csv (AC Transmission Lines)
 
-```csv
+```text
 from,to,x,r,p_max,length
 bus_001,bus_002,0.0123,0.0045,500,125.5
 bus_002,bus_004,0.0234,0.0089,400,98.2
@@ -139,14 +139,14 @@ bus_002,bus_004,0.0234,0.0089,400,98.2
 
 ### transformers.csv
 
-```csv
+```text
 from,to,x,r,s_nom,tap_ratio
 bus_002,bus_003,0.05,0.01,400,1.0
 ```
 
 ### converters.csv (Optional)
 
-```csv
+```text
 id,bus,p_max
 conv_1,bus_010,1000
 conv_2,bus_020,1000
@@ -154,7 +154,7 @@ conv_2,bus_020,1000
 
 ### dc_links.csv (Optional)
 
-```csv
+```text
 from,to,p_max,converter_from,converter_to
 conv_1,conv_2,800,conv_1,conv_2
 ```
