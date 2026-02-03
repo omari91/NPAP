@@ -17,9 +17,12 @@
 
 ---
 
-**NPAP** is an open-source Python library for **partitioning and aggregating network graphs**, with a special focus on electrical power systems. Built on top of [NetworkX](https://networkx.org/), it provides a clean strategy-based architecture that makes it easy to cluster networks and reduce their complexity while preserving essential properties.
+**NPAP** is an open-source Python library for **partitioning and aggregating network graphs**, with a special focus on electrical power systems. Built
+on top of [NetworkX](https://networkx.org/), it provides a clean strategy-based architecture that makes it easy to cluster networks and reduce their
+complexity while preserving essential properties.
 
-Whether you're working with power grids, transportation networks, or any graph-based spatial data, NPAP helps you simplify complex networks into manageable pieces.
+Whether you're working with power grids, transportation networks, or any graph-based spatial data, NPAP helps you simplify complex networks into
+manageable pieces.
 
 ## Features
 
@@ -82,9 +85,16 @@ manager.plot_network(style='simple', title='Aggregated Network')
 
 ## Contributing
 
-We warmly welcome contributions from everyone! Whether it's fixing a typo, improving documentation, reporting bugs, or implementing new features — every contribution matters.
+We warmly welcome contributions from everyone! Whether it's fixing a typo, improving documentation, reporting bugs, or implementing new features —
+every contribution matters.
 
 Please read our [Contributing Guide](CONTRIBUTING.md) to get started. Don't hesitate to open an issue if you have questions or ideas!
+
+## Acknowledgements
+
+Funded by the European Union (ERC, NetZero-Opt, 101116212). Views and opinions expressed are however those of the author(s) only and do not
+necessarily reflect those of the European Union or the European Research Council. Neither the European Union nor the granting authority can be held
+responsible for them.
 
 ## License
 
