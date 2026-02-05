@@ -83,11 +83,11 @@ aggregated = manager.aggregate(mode=npap.AggregationMode.GEOGRAPHICAL)
 
 ## Data Loading Strategies
 
-| Strategy | Description | Required Parameters |
-|----------|-------------|---------------------|
-| `networkx_direct` | Load from existing NetworkX graph | `graph` |
-| `csv_files` | Load from separate CSV files | `node_file`, `edge_file` |
-| `va_loader` | Voltage-aware power system loader | `node_file`, `line_file`, `transformer_file` |
+| Strategy | Description                                   | Required Parameters |
+|----------|-----------------------------------------------|---------------------|
+| `networkx_direct` | Load from existing NetworkX graph             | `graph` |
+| `csv_files` | Load from separate CSV files                  | `node_file`, `edge_file` |
+| `va_loader` | Voltage-aware power system loader (CSV files) | `node_file`, `line_file`, `transformer_file` |
 
 ### When to Use Each Loader
 
@@ -127,10 +127,10 @@ Clusters nodes based on geographic coordinates.
 
 Clusters nodes based on electrical distance (PTDF approach) respecting DC islands.
 
-| Strategy | Algorithm | Description |
-|----------|-----------|-------------|
-| `electrical_kmeans` | K-Means | Fast electrical clustering |
-| `electrical_kmedoids` | K-Medoids | Robust electrical clustering |
+| Strategy | Algorithm | Description                                           |
+|----------|-----------|-------------------------------------------------------|
+| `electrical_kmeans` | K-Means | Provides arbitrary centroid node                      |
+| `electrical_kmedoids` | K-Medoids | Provides existing centroid node (e.g. Kron-Reduction) |
 
 **Required attributes**: Nodes: `dc_island` | Edges: `x` (reactance)
 
@@ -138,14 +138,18 @@ Clusters nodes based on electrical distance (PTDF approach) respecting DC island
 
 Combines geographical distance with voltage level and DC island constraints.
 
-| Strategy | Mode | Description |
-|----------|------|-------------|
+Voltage-aware geographical partitioning provides two modes for defining the number of clusters per voltage level:
+1. **Standard**: Only the total number of clusters over all voltage levels is specified by the user. The number of clusters per voltage level is set by the clustering algorithm.
+2. **Proportional**: The user specifies the total number of clusters and the number of clusters per voltage level gets defined proportionally to the number of nodes at each voltage level.
+
+| Strategy | Mode | Description                       |
+|----------|------|-----------------------------------|
 | `va_geographical_kmedoids_euclidean` | Standard | K-Medoids with Euclidean distance |
 | `va_geographical_kmedoids_haversine` | Standard | K-Medoids with Haversine distance |
-| `va_geographical_hierarchical` | Standard | Agglomerative clustering |
-| `va_geographical_proportional_kmedoids_euclidean` | Proportional | Balanced by group |
-| `va_geographical_proportional_kmedoids_haversine` | Proportional | Balanced by group |
-| `va_geographical_proportional_hierarchical` | Proportional | Balanced hierarchical |
+| `va_geographical_hierarchical` | Standard | Agglomerative clustering          |
+| `va_geographical_proportional_kmedoids_euclidean` | Proportional | Proportional by number of nodes   |
+| `va_geographical_proportional_kmedoids_haversine` | Proportional | Proportional by number of nodes                 |
+| `va_geographical_proportional_hierarchical` | Proportional | Proportional by number of nodes             |
 
 **Required node attributes**: `lat`, `lon`, `voltage`, `dc_island`
 
@@ -172,9 +176,7 @@ flowchart TD
     D -->|Yes| G[electrical_*]
     D -->|No| H{DC islands?}
     H -->|Yes| I[geographical_kmedoids_*]
-    H -->|No| J{Fast or robust?}
-    J -->|Fast| K[geographical_kmeans]
-    J -->|Robust| L[geographical_kmedoids_*]
+    H -->|No| L[geographical_*]
 
     style A fill:#2993B5,stroke:#1d6f8a,color:#fff
     style B fill:#FFBF00,stroke:#cc9900,color:#1e293b
@@ -185,8 +187,6 @@ flowchart TD
     style G fill:#0fad6b,stroke:#076b3f,color:#fff
     style H fill:#FFBF00,stroke:#cc9900,color:#1e293b
     style I fill:#0fad6b,stroke:#076b3f,color:#fff
-    style J fill:#FFBF00,stroke:#cc9900,color:#1e293b
-    style K fill:#0fad6b,stroke:#076b3f,color:#fff
     style L fill:#0fad6b,stroke:#076b3f,color:#fff
 ```
 
@@ -200,11 +200,11 @@ Aggregation uses {py:class}`~npap.AggregationProfile` that define how the networ
 
 Predefined {py:class}`~npap.AggregationMode` for common use cases:
 
-| Mode | Topology | Node Properties | Edge Properties |
-|------|----------|-----------------|-----------------|
-| `SIMPLE` | simple | sum all | sum all |
-| `GEOGRAPHICAL` | simple | avg coords, sum loads | sum capacity, avg reactance |
-| `CUSTOM` | user-defined | user-defined | user-defined |
+| Mode | Topology | Node Properties | Edge Properties                    |
+|------|----------|-----------------|------------------------------------|
+| `SIMPLE` | simple | sum all | sum all                            |
+| `GEOGRAPHICAL` | simple | avg coords, sum loads | sum capacity, equivalent reactance |
+| `CUSTOM` | user-defined | user-defined | user-defined                       |
 
 ```python
 from npap import AggregationMode
@@ -250,11 +250,11 @@ aggregated = manager.aggregate(profile=profile)
 
 **Edge properties:**
 
-| Strategy | Formula | Use Case |
-|----------|---------|----------|
-| `sum` | $\sum x_i$ | Capacity, length |
-| `average` | $\frac{1}{n}\sum x_i$ | General properties |
-| `first` | $x_1$ | Type, category |
+| Strategy | Formula | Use Case          |
+|----------|---------|-------------------|
+| `sum` | $\sum x_i$ | Capacity    |
+| `average` | $\frac{1}{n}\sum x_i$ | Length            |
+| `first` | $x_1$ | Type, category    |
 | `equivalent_reactance` | $\frac{1}{\sum \frac{1}{x_i}}$ | Parallel impedances |
 
 See [Aggregation](aggregation.md) for detailed documentation.
