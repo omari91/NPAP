@@ -48,6 +48,7 @@ NPAP provides predefined aggregation modes for common use cases.
 |------|-------------|----------|
 | `SIMPLE` | Sum all numeric properties | Basic reduction |
 | `GEOGRAPHICAL` | Average coordinates, sum loads | Spatial analysis |
+| `DC_KRON` | Kron reduction for DC networks | DC network analysis |
 | `CUSTOM` | User-defined profile | Advanced use |
 
 ### SIMPLE Mode
@@ -123,7 +124,7 @@ The {py:class}`~npap.AggregationProfile` controls all aspects of aggregation.
 | `physical_parameters` | dict | `{}` | Extra parameters for physical strategy |
 | `node_properties` | dict[str, str] | `{}` | Property → aggregation method mapping |
 | `edge_properties` | dict[str, str] | `{}` | Property → aggregation method mapping |
-| `default_node_strategy` | str | `"sum"` | Fallback for unmapped node properties |
+| `default_node_strategy` | str | `"average"` | Fallback for unmapped node properties |
 | `default_edge_strategy` | str | `"sum"` | Fallback for unmapped edge properties |
 | `warn_on_defaults` | bool | `True` | Warn when using default strategies |
 | `mode` | AggregationMode | `CUSTOM` | Associated mode |

@@ -10,6 +10,7 @@ flowchart TB
         DLS[DataLoadingStrategy]
         PS[PartitioningStrategy]
         TS[TopologyStrategy]
+        PAS[PhysicalAggregationStrategy]
         NPS[NodePropertyStrategy]
         EPS[EdgePropertyStrategy]
     end
@@ -27,6 +28,7 @@ flowchart TB
     style DLS fill:#2993B5,stroke:#1d6f8a,color:#fff
     style PS fill:#2993B5,stroke:#1d6f8a,color:#fff
     style TS fill:#2993B5,stroke:#1d6f8a,color:#fff
+    style PAS fill:#2993B5,stroke:#1d6f8a,color:#fff
     style NPS fill:#2993B5,stroke:#1d6f8a,color:#fff
     style EPS fill:#2993B5,stroke:#1d6f8a,color:#fff
     style CL fill:#0fad6b,stroke:#076b3f,color:#fff
@@ -195,22 +197,21 @@ class MedianNodeStrategy(NodePropertyStrategy):
 
 ```python
 from npap.interfaces import EdgePropertyStrategy
-import networkx as nx
+from typing import Any
 
 class MaxEdgeStrategy(EdgePropertyStrategy):
     """Aggregate using maximum value."""
 
     def aggregate_property(
         self,
-        graph: nx.DiGraph,
-        edges: list[tuple],
+        original_edges: list[dict[str, Any]],
         property_name: str
     ):
         """Return maximum value across edges."""
         values = [
-            graph.edges[u, v][property_name]
-            for u, v in edges
-            if property_name in graph.edges[u, v]
+            edge[property_name]
+            for edge in original_edges
+            if property_name in edge
         ]
         return max(values) if values else 0
 ```
@@ -304,7 +305,7 @@ class MyPartitioning(PartitioningStrategy):
         if n_clusters < 1:
             raise ValidationError(
                 "n_clusters must be positive",
-                details={"n_clusters": n_clusters}
+                strategy="my_partitioning"
             )
 
         try:
@@ -313,7 +314,7 @@ class MyPartitioning(PartitioningStrategy):
         except Exception as e:
             raise PartitioningError(
                 f"Partitioning failed: {e}",
-                strategy_name="my_partitioning"
+                strategy="my_partitioning"
             )
 ```
 

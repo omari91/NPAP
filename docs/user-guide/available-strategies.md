@@ -108,16 +108,16 @@ NPAP provides four families of partitioning strategies:
 
 Clusters nodes based on geographic coordinates.
 
-| Strategy | Algorithm | Metric | DC-Island Aware Support |
-|----------|-----------|--------|-------------------------|
-| `geographical_kmeans` | K-Means | Euclidean | No                      |
-| `geographical_kmedoids_euclidean` | K-Medoids | Euclidean | Yes                     |
-| `geographical_kmedoids_haversine` | K-Medoids | Haversine | Yes                     |
-| `geographical_dbscan_euclidean` | DBSCAN | Euclidean | Yes                     |
-| `geographical_dbscan_haversine` | DBSCAN | Haversine | Yes                     |
-| `geographical_hierarchical` | Agglomerative | Euclidean | Yes*                    |
-| `geographical_hdbscan_euclidean` | HDBSCAN | Euclidean | Yes                     |
-| `geographical_hdbscan_haversine` | HDBSCAN | Haversine | Yes                     |
+| Strategy | Algorithm | Metric | DC-Island Aware |
+|----------|-----------|--------|-----------------|
+| `geographical_kmeans` | K-Means | Euclidean | No |
+| `geographical_kmedoids_euclidean` | K-Medoids | Euclidean | Yes |
+| `geographical_kmedoids_haversine` | K-Medoids | Haversine | Yes |
+| `geographical_dbscan_euclidean` | DBSCAN | Euclidean | Yes |
+| `geographical_dbscan_haversine` | DBSCAN | Haversine | Yes |
+| `geographical_hierarchical` | Agglomerative | Euclidean | Yes* |
+| `geographical_hdbscan_euclidean` | HDBSCAN | Euclidean | Yes |
+| `geographical_hdbscan_haversine` | HDBSCAN | Haversine | Yes |
 
 *Ward linkage does not support DC-island awareness
 
@@ -204,6 +204,7 @@ Predefined {py:class}`~npap.AggregationMode` for common use cases:
 |------|----------|-----------------|------------------------------------|
 | `SIMPLE` | simple | sum all | sum all                            |
 | `GEOGRAPHICAL` | simple | avg coords, sum loads | sum capacity, equivalent reactance |
+| `DC_KRON` | electrical | Kron reduction | Kron reduction                     |
 | `CUSTOM` | user-defined | user-defined | user-defined                       |
 
 ```python

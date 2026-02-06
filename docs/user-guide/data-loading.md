@@ -310,7 +310,6 @@ graph = manager.load_data("va_loader", ...)
 manager.group_by_voltage_levels(
     target_levels=[220, 380],      # Target voltage levels in kV
     voltage_attr="voltage",         # Attribute containing voltage
-    tolerance=10                    # Tolerance in kV
 )
 ```
 

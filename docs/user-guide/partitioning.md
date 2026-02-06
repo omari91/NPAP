@@ -6,9 +6,9 @@ Partitioning divides a network into clusters of nodes based on distance metrics.
 
 | Strategy Family | Distance Metric            | Use Case                                  |
 |-----------------|----------------------------|-------------------------------------------|
-| Geographic | Euclidean / Haversine      | Spatial proximity clustering              |
+| Geographical | Euclidean / Haversine      | Spatial proximity clustering              |
 | Electrical | PTDF-based                 | Electrical behavior clustering            |
-| VA Geographic | Geographic + Voltage aware | Multi-voltage-level networks              |
+| VA Geographical | Geographical + Voltage aware | Multi-voltage-level networks              |
 | VA Electrical | PTDF + Voltage aware       | Multi-voltage-level electrical clustering |
 
 ## Basic Usage
@@ -430,8 +430,8 @@ flowchart TD
 
 | Use Case                     | Recommended Strategy |
 |------------------------------|---------------------|
-| Geographic clustering        | `geographical_kmeans` |
-| Geographic with DC islands   | `geographical_kmedoids_haversine` |
+| Geographical clustering      | `geographical_kmeans` |
+| Geographical with DC islands | `geographical_kmedoids_haversine` |
 | Electrical behavior grouping | `electrical_kmedoids` |
 | Multi-voltage network        | `va_geographical_kmedoids_haversine` |
 | Unknown cluster count        | `geographical_dbscan_*` or `geographical_hdbscan_*` |

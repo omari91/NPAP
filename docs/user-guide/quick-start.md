@@ -68,7 +68,7 @@ if isinstance(graph, nx.MultiDiGraph):
         default_strategy="average",
         warn_on_defaults=False
     )
-    print(f"After parallel edge aggregation: {manager.graph.number_of_edges()} edges")
+    print(f"After parallel edge aggregation: {manager.get_current_graph().number_of_edges()} edges")
 
 # =============================================================================
 # Step 4: Partition the Network

@@ -131,32 +131,32 @@ manager.plot_network(style="voltage_aware", config=config)
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `voltage_threshold` | float | `300` | Threshold (kV) for high/low voltage |
+| `line_voltage_threshold` | float | `300.0` | Threshold (kV) for high/low voltage |
 
 #### Colors
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `high_voltage_color` | `"#e74c3c"` | High voltage lines (>threshold) |
-| `low_voltage_color` | `"#3498db"` | Low voltage lines (≤threshold) |
-| `trafo_color` | `"#9b59b6"` | Transformers |
-| `dc_link_color` | `"#2ecc71"` | DC links |
-| `node_color` | `"#34495e"` | Nodes (non-clustered) |
+| `line_high_voltage_color` | `"#029E73"` | High voltage lines (>threshold) |
+| `line_low_voltage_color` | `"#CA9161"` | Low voltage lines (≤threshold) |
+| `trafo_color` | `"#ECE133"` | Transformers |
+| `dc_link_color` | `"#CC78BC"` | DC links |
+| `node_color` | `"#0173B2"` | Nodes (non-clustered) |
 
 #### Geometry
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `edge_width` | float | `1.5` | Line width in pixels |
-| `node_size` | float | `6` | Node marker size |
+| `node_size` | int | `5` | Node marker size |
 
 #### Map Settings
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `map_center_lat` | float | `47.0` | Map center latitude |
-| `map_center_lon` | float | `15.0` | Map center longitude |
-| `map_zoom` | float | `5` | Initial zoom level |
+| `map_center_lat` | float | `57.5` | Map center latitude |
+| `map_center_lon` | float | `14.0` | Map center longitude |
+| `map_zoom` | float | `3.7` | Initial zoom level |
 | `map_style` | str | `"carto-positron"` | Map tile style |
 
 ### Map Styles
@@ -356,12 +356,12 @@ manager.load_data(
 
 # Configure for power system visualization
 config = PlotConfig(
-    voltage_threshold=300,        # 300 kV threshold
-    high_voltage_color="#c0392b", # Dark red for EHV
-    low_voltage_color="#2980b9",  # Blue for HV
-    trafo_color="#8e44ad",        # Purple for transformers
-    dc_link_color="#27ae60",      # Green for DC
-    map_style="carto-darkmatter"  # Dark theme
+    line_voltage_threshold=300,        # 300 kV threshold
+    line_high_voltage_color="#c0392b", # Dark red for EHV
+    line_low_voltage_color="#2980b9",  # Blue for HV
+    trafo_color="#8e44ad",             # Purple for transformers
+    dc_link_color="#27ae60",           # Green for DC
+    map_style="carto-darkmatter"       # Dark theme
 )
 
 manager.plot_network(style="voltage_aware", config=config)

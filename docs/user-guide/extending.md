@@ -310,25 +310,21 @@ class MedianNodeStrategy(NodePropertyStrategy):
 
 ```python
 from npap.interfaces import EdgePropertyStrategy
-import networkx as nx
 
 class MaxEdgeStrategy(EdgePropertyStrategy):
     """Aggregate edge properties using maximum value."""
 
     def aggregate_property(
         self,
-        graph: nx.DiGraph,
-        edges: list[tuple],
+        original_edges: list[dict[str, Any]],
         property_name: str
     ):
         """Return maximum property value across edges.
 
         Parameters
         ----------
-        graph : nx.DiGraph
-            The original graph.
-        edges : list[tuple]
-            List of (u, v) edge tuples.
+        original_edges : list[dict[str, Any]]
+            List of edge attribute dictionaries.
         property_name : str
             Name of property to aggregate.
 
@@ -338,9 +334,9 @@ class MaxEdgeStrategy(EdgePropertyStrategy):
             Maximum value.
         """
         values = [
-            graph.edges[u, v][property_name]
-            for u, v in edges
-            if property_name in graph.edges[u, v]
+            edge[property_name]
+            for edge in original_edges
+            if property_name in edge
         ]
 
         if not values:
@@ -506,7 +502,7 @@ class MyPartitioning(PartitioningStrategy):
         if n_clusters < 1:
             raise ValidationError(
                 "n_clusters must be positive",
-                details={"n_clusters": n_clusters}
+                strategy="my_partitioning"
             )
 
         try:
@@ -515,7 +511,7 @@ class MyPartitioning(PartitioningStrategy):
         except Exception as e:
             raise PartitioningError(
                 f"Partitioning failed: {e}",
-                strategy_name="my_partitioning"
+                strategy="my_partitioning"
             )
 ```
 

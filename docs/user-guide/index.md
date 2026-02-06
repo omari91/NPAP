@@ -78,7 +78,7 @@ Load networks from CSV files, NetworkX graphs, or voltage-aware power system for
 :link: partitioning
 :link-type: doc
 
-Geographic, electrical, and voltage-aware partitioning strategies.
+Geographical, electrical, and voltage-aware partitioning strategies.
 :::
 
 :::{grid-item-card} Aggregation
@@ -144,7 +144,7 @@ Different strategies require specific node and edge attributes:
 
 | Strategy Type | Node Attributes | Edge Attributes |
 |---------------|-----------------|-----------------|
-| Geographic | `lat`, `lon` | — |
+| Geographical | `lat`, `lon` | — |
 | Electrical | `dc_island` | `x` (reactance) |
 | Voltage-Aware | `lat`, `lon`, `voltage`, `dc_island` | `x`, `type` |
 
