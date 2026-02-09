@@ -13,7 +13,7 @@ ElectricalDistancePartitioning
 VAGeographicalPartitioning
     Voltage-aware geographical partitioning respecting voltage level boundaries.
 VAElectricalDistancePartitioning
-    Voltage-aware electrical distance partitioning with DC island awareness.
+    Voltage-aware electrical distance partitioning with AC island awareness.
 """
 
 from .electrical import ElectricalDistancePartitioning

@@ -35,7 +35,7 @@ class ElectricalDistanceConfig:
         Set to 0.0 to disable regularization. Default 1e-10 provides
         mild regularization that prevents singular matrix issues.
     infinite_distance : float
-        Value used to represent "infinite" distance between DC islands.
+        Value used to represent "infinite" distance between AC islands.
     """
 
     zero_reactance_replacement: float = 1e-5
@@ -59,10 +59,10 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         - Compute PTDF = diag{b} · K_sba · B^(-1)
         - Electrical distance: d_ij = ||PTDF[:,i] - PTDF[:,j]||_2
 
-    Multi DC-Island Support:
-        Networks with multiple DC islands (AC zones connected via HVDC) are handled
+    Multi AC-Island Support:
+        Networks with multiple AC islands (AC zones connected via HVDC) are handled
         by computing PTDF matrices independently for each island:
-        1. Group nodes by DC island
+        1. Group nodes by AC island
         2. Select/detect slack bus per island
         3. Extract AC-only subgraph per island (lines + transformers, no DC links)
         4. Compute PTDF and distances per island
@@ -94,7 +94,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         self,
         algorithm: str = "kmeans",
         slack_bus: Any | None = None,
-        dc_island_attr: str = "dc_island",
+        ac_island_attr: str = "ac_island",
         config: ElectricalDistanceConfig | None = None,
     ):
         """
@@ -107,8 +107,8 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         slack_bus : Any, optional
             Specific node to use as slack bus (applied to its island),
             or None for auto-selection per island.
-        dc_island_attr : str, default='dc_island'
-            Node attribute name containing DC island ID.
+        ac_island_attr : str, default='ac_island'
+            Node attribute name containing AC island ID.
         config : ElectricalDistanceConfig, optional
             Configuration parameters for distance calculations.
 
@@ -119,7 +119,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         """
         self.algorithm = algorithm
         self.slack_bus = slack_bus
-        self.dc_island_attr = dc_island_attr
+        self.ac_island_attr = ac_island_attr
         self.config = config or ElectricalDistanceConfig()
 
         if algorithm not in self.SUPPORTED_ALGORITHMS:
@@ -130,7 +130,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
         log_debug(
             f"Initialized ElectricalDistancePartitioning: algorithm={algorithm}, "
-            f"dc_island_attr={dc_island_attr}",
+            f"ac_island_attr={ac_island_attr}",
             LogCategory.PARTITIONING,
         )
 
@@ -138,7 +138,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
     def required_attributes(self) -> dict[str, list[str]]:
         """Required attributes for electrical distance partitioning."""
         return {
-            "nodes": [],  # dc_island is validated separately with helpful message
+            "nodes": [],  # ac_island is validated separately with helpful message
             "edges": ["x"],  # Reactance attribute required on AC edges
         }
 
@@ -154,7 +154,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         Parameters
         ----------
         graph : nx.DiGraph
-            NetworkX DiGraph with reactance data on AC edges and dc_island on nodes.
+            NetworkX DiGraph with reactance data on AC edges and ac_island on nodes.
         **kwargs : dict
             Additional parameters:
 
@@ -177,7 +177,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         PartitioningError
             If partitioning fails.
         ValidationError
-            If dc_island attribute is missing.
+            If ac_island attribute is missing.
         """
         try:
             # Get effective config (injected by decorator)
@@ -186,8 +186,8 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             # Resolve slack bus (kwargs override instance default)
             effective_slack = kwargs.get("slack_bus", self.slack_bus)
 
-            # Validate DC island attributes
-            self._validate_dc_island_attributes(graph)
+            # Validate AC island attributes
+            self._validate_ac_island_attributes(graph)
 
             # Validate AC edges have reactance
             self._validate_ac_edge_attributes(graph)
@@ -231,8 +231,8 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             partition_map = create_partition_map(nodes, labels)
             validate_partition(partition_map, n_nodes, self._get_strategy_name())
 
-            # Validate DC island consistency
-            self._validate_cluster_dc_island_consistency(graph, partition_map)
+            # Validate AC island consistency
+            self._validate_cluster_ac_island_consistency(graph, partition_map)
 
             log_info(
                 f"Electrical partitioning complete: {len(partition_map)} clusters",
@@ -289,12 +289,12 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
     # VALIDATION METHODS
     # =========================================================================
 
-    def _validate_dc_island_attributes(self, graph: nx.DiGraph) -> None:
+    def _validate_ac_island_attributes(self, graph: nx.DiGraph) -> None:
         """
-        Validate that all nodes have the DC island attribute.
+        Validate that all nodes have the AC island attribute.
 
         Provides a helpful error message directing users to use va_loader
-        or manually add the dc_island attribute.
+        or manually add the ac_island attribute.
 
         Parameters
         ----------
@@ -304,22 +304,22 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         Raises
         ------
         ValidationError
-            If any node is missing the dc_island attribute.
+            If any node is missing the ac_island attribute.
         """
         missing_nodes = []
         for node in graph.nodes():
-            if self.dc_island_attr not in graph.nodes[node]:
+            if self.ac_island_attr not in graph.nodes[node]:
                 missing_nodes.append(node)
 
         if missing_nodes:
             sample = missing_nodes[:5]
             raise ValidationError(
-                f"Electrical distance partitioning requires '{self.dc_island_attr}' attribute "
-                f"on all nodes for DC island isolation. "
+                f"Electrical distance partitioning requires '{self.ac_island_attr}' attribute "
+                f"on all nodes for AC island isolation. "
                 f"{len(missing_nodes)} node(s) are missing this attribute (first few: {sample}). "
-                f"Please use 'va_loader' data loading strategy to automatically detect DC islands, "
-                f"or manually add the '{self.dc_island_attr}' attribute to all nodes.",
-                missing_attributes={"nodes": [self.dc_island_attr]},
+                f"Please use 'va_loader' data loading strategy to automatically detect AC islands, "
+                f"or manually add the '{self.ac_island_attr}' attribute to all nodes.",
+                missing_attributes={"nodes": [self.ac_island_attr]},
                 strategy=self._get_strategy_name(),
             )
 
@@ -369,7 +369,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         ac_subgraph : nx.DiGraph
             AC-only subgraph for the island.
         island_id : Any
-            DC island identifier.
+            AC island identifier.
         island_nodes : list[Any]
             Nodes in this island.
 
@@ -384,7 +384,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
         if ac_subgraph.number_of_edges() == 0:
             raise PartitioningError(
-                f"DC island {island_id} has no AC edges (lines/transformers). "
+                f"AC island {island_id} has no AC edges (lines/transformers). "
                 f"Cannot compute electrical distances without AC connectivity.",
                 strategy=self._get_strategy_name(),
                 graph_info={"island_id": island_id, "n_nodes": len(island_nodes)},
@@ -393,9 +393,9 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         if not nx.is_weakly_connected(ac_subgraph):
             n_components = nx.number_weakly_connected_components(ac_subgraph)
             raise PartitioningError(
-                f"DC island {island_id} is not AC-connected. Found {n_components} "
+                f"AC island {island_id} is not AC-connected. Found {n_components} "
                 f"disconnected AC components within the island. This may indicate "
-                f"missing line/transformer data or incorrect DC island assignment.",
+                f"missing line/transformer data or incorrect AC island assignment.",
                 strategy=self._get_strategy_name(),
                 graph_info={
                     "island_id": island_id,
@@ -405,14 +405,14 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
                 },
             )
 
-    def _validate_cluster_dc_island_consistency(
+    def _validate_cluster_ac_island_consistency(
         self, graph: nx.DiGraph, partition_map: dict[int, list[Any]]
     ) -> None:
         """
-        Validate that clusters don't mix different DC islands.
+        Validate that clusters don't mix different AC islands.
 
-        With infinite distances between DC islands, clusters should never mix
-        nodes from different DC islands.
+        With infinite distances between AC islands, clusters should never mix
+        nodes from different AC islands.
 
         Parameters
         ----------
@@ -422,23 +422,23 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
             Resulting partition mapping.
         """
         for cluster_id, nodes in partition_map.items():
-            dc_islands_in_cluster = set()
+            ac_islands_in_cluster = set()
 
             for node in nodes:
-                dc_island = graph.nodes[node].get(self.dc_island_attr)
-                if dc_island is not None:
-                    dc_islands_in_cluster.add(dc_island)
+                ac_island = graph.nodes[node].get(self.ac_island_attr)
+                if ac_island is not None:
+                    ac_islands_in_cluster.add(ac_island)
 
-            if len(dc_islands_in_cluster) > 1:
+            if len(ac_islands_in_cluster) > 1:
                 log_warning(
-                    f"Cluster {cluster_id} contains nodes from multiple DC islands: "
-                    f"{dc_islands_in_cluster}. This should not happen with infinite distances.",
+                    f"Cluster {cluster_id} contains nodes from multiple AC islands: "
+                    f"{ac_islands_in_cluster}. This should not happen with infinite distances.",
                     LogCategory.PARTITIONING,
                     warn_user=False,
                 )
 
     # =========================================================================
-    # MULTI DC-ISLAND ELECTRICAL DISTANCE CALCULATION
+    # MULTI AC-ISLAND ELECTRICAL DISTANCE CALCULATION
     # =========================================================================
 
     def _calculate_electrical_distance_matrix(
@@ -451,9 +451,9 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         """
         Calculate electrical distance matrix with per-island PTDF computation.
 
-        For networks with multiple DC islands:
+        For networks with multiple AC islands:
 
-        1. Group nodes by DC island
+        1. Group nodes by AC island
         2. For each island: extract AC subgraph, select slack, compute PTDF distances
         3. Combine into block-diagonal matrix with infinite inter-island distances
 
@@ -478,12 +478,12 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         PartitioningError
             If distance matrix calculation fails.
         """
-        # Group nodes by DC island
-        islands = self._group_nodes_by_dc_island(graph, nodes)
+        # Group nodes by AC island
+        islands = self._group_nodes_by_ac_island(graph, nodes)
         n_islands = len(islands)
 
         log_info(
-            f"Processing {n_islands} DC island(s) for PTDF computation",
+            f"Processing {n_islands} AC island(s) for PTDF computation",
             LogCategory.PARTITIONING,
         )
 
@@ -498,7 +498,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         # Process each island independently
         for island_id, island_nodes in islands.items():
             log_debug(
-                f"Processing DC island {island_id}: {len(island_nodes)} nodes",
+                f"Processing AC island {island_id}: {len(island_nodes)} nodes",
                 LogCategory.PARTITIONING,
             )
 
@@ -533,16 +533,16 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
 
         return distance_matrix
 
-    def _group_nodes_by_dc_island(
+    def _group_nodes_by_ac_island(
         self, graph: nx.DiGraph, nodes: list[Any]
     ) -> dict[Any, list[Any]]:
         """
-        Group nodes by their DC island attribute.
+        Group nodes by their AC island attribute.
 
         Parameters
         ----------
         graph : nx.DiGraph
-            NetworkX DiGraph with dc_island attribute on nodes.
+            NetworkX DiGraph with ac_island attribute on nodes.
         nodes : list[Any]
             List of nodes to group.
 
@@ -554,7 +554,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         islands: dict[Any, list[Any]] = defaultdict(list)
 
         for node in nodes:
-            island_id = graph.nodes[node].get(self.dc_island_attr)
+            island_id = graph.nodes[node].get(self.ac_island_attr)
             islands[island_id].append(node)
 
         return dict(islands)
@@ -615,7 +615,7 @@ class ElectricalDistancePartitioning(PartitioningStrategy):
         user_slack : Any, optional
             User-specified slack bus (may be None or in different island).
         island_id : Any
-            DC island identifier for logging.
+            AC island identifier for logging.
 
         Returns
         -------

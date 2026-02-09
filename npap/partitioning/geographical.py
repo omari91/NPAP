@@ -39,7 +39,7 @@ class GeographicalConfig:
         ('ward' for Euclidean, or 'complete'/'average'/'single').
     infinite_distance : float
         Value used to represent "infinite" distance between nodes in different
-        DC islands. Using a large finite value instead of np.inf to avoid
+        AC islands. Using a large finite value instead of np.inf to avoid
         numerical issues in clustering algorithms.
     """
 
@@ -58,23 +58,23 @@ class GeographicalPartitioning(PartitioningStrategy):
     various clustering algorithms. It supports both Euclidean distance
     (for projected coordinates) and Haversine distance (for lat/lon coordinates).
 
-    DC-Island Awareness:
+    AC-Island Awareness:
         When the graph contains data with DC links (nodes have given
-        'dc_island' attribute), the strategy automatically respects DC island
+        'ac_island' attribute), the strategy automatically respects AC island
         boundaries by assigning infinite distance between nodes in different
-        DC islands.
+        AC islands.
 
         Note: K-means and hierarchical with 'ward' linkage cannot support
-        DC-island awareness because they use raw coordinates instead of
-        precomputed distances. When DC islands are detected with these
+        AC-island awareness because they use raw coordinates instead of
+        precomputed distances. When AC islands are detected with these
         algorithms, a warning is issued recommending alternative algorithms.
 
     Supported algorithms:
-        - 'kmeans': K-Means clustering (Euclidean only, fast, no DC-island support)
-        - 'kmedoids': K-Medoids clustering (any metric, robust to outliers, DC-island aware)
-        - 'dbscan': DBSCAN density-based clustering (automatic cluster count, DC-island aware)
-        - 'hierarchical': Agglomerative hierarchical clustering (DC-island aware except ward)
-        - 'hdbscan': HDBSCAN density-based clustering (automatic cluster count, DC-island aware)
+        - 'kmeans': K-Means clustering (Euclidean only, fast, no AC-island support)
+        - 'kmedoids': K-Medoids clustering (any metric, robust to outliers, AC-island aware)
+        - 'dbscan': DBSCAN density-based clustering (automatic cluster count, AC-island aware)
+        - 'hierarchical': Agglomerative hierarchical clustering (AC-island aware except ward)
+        - 'hdbscan': HDBSCAN density-based clustering (automatic cluster count, AC-island aware)
 
     Configuration can be provided at:
     - Instantiation time (via `config` parameter in __init__)
@@ -86,8 +86,8 @@ class GeographicalPartitioning(PartitioningStrategy):
     SUPPORTED_ALGORITHMS = ["kmeans", "kmedoids", "dbscan", "hierarchical", "hdbscan"]
     SUPPORTED_DISTANCE_METRICS = ["euclidean", "haversine"]
 
-    # Algorithms that support DC-island awareness (use precomputed distances)
-    DC_ISLAND_AWARE_ALGORITHMS = ["kmedoids", "dbscan", "hdbscan"]
+    # Algorithms that support AC-island awareness (use precomputed distances)
+    AC_ISLAND_AWARE_ALGORITHMS = ["kmedoids", "dbscan", "hdbscan"]
 
     # Config parameter names for runtime override detection
     _CONFIG_PARAMS = {
@@ -102,7 +102,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         self,
         algorithm: str = "kmeans",
         distance_metric: str = "euclidean",
-        dc_island_attr: str = "dc_island",
+        ac_island_attr: str = "ac_island",
         config: GeographicalConfig | None = None,
     ):
         """
@@ -115,8 +115,8 @@ class GeographicalPartitioning(PartitioningStrategy):
             'hierarchical', 'hdbscan').
         distance_metric : str, default='euclidean'
             Distance metric ('haversine', 'euclidean').
-        dc_island_attr : str, default='dc_island'
-            Node attribute name containing DC island ID.
+        ac_island_attr : str, default='ac_island'
+            Node attribute name containing AC island ID.
         config : GeographicalConfig, optional
             Configuration parameters for the algorithm.
 
@@ -127,7 +127,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         """
         self.algorithm = algorithm
         self.distance_metric = distance_metric
-        self.dc_island_attr: str = dc_island_attr
+        self.ac_island_attr: str = ac_island_attr
         self.config = config or GeographicalConfig()
 
         if algorithm not in self.SUPPORTED_ALGORITHMS:
@@ -162,10 +162,10 @@ class GeographicalPartitioning(PartitioningStrategy):
         """
         Partition nodes based on geographical coordinates.
 
-        Automatically detects and respects DC island boundaries when the graph
-        contains voltage-aware data (nodes have 'dc_island' attribute). When
-        DC islands are detected, infinite distance is assigned between nodes
-        in different DC islands.
+        Automatically detects and respects AC island boundaries when the graph
+        contains voltage-aware data (nodes have 'ac_island' attribute). When
+        AC islands are detected, infinite distance is assigned between nodes
+        in different AC islands.
 
         Parameters
         ----------
@@ -204,28 +204,28 @@ class GeographicalPartitioning(PartitioningStrategy):
             nodes = list(graph.nodes())
             coordinates = self._extract_coordinates(graph, nodes)
 
-            # Auto-detect DC island data
-            dc_islands = None
-            has_dc_islands = self._has_dc_island_data(graph, nodes)
+            # Auto-detect AC island data
+            ac_islands = None
+            has_ac_islands = self._has_ac_island_data(graph, nodes)
 
-            if has_dc_islands:
-                dc_islands = self._extract_dc_islands(graph, nodes)
-                n_dc_islands = len(set(dc_islands))
+            if has_ac_islands:
+                ac_islands = self._extract_ac_islands(graph, nodes)
+                n_ac_islands = len(set(ac_islands))
 
-                # Check if algorithm supports DC-island awareness
-                if not self._supports_dc_island_awareness(effective_config):
+                # Check if algorithm supports AC-island awareness
+                if not self._supports_ac_island_awareness(effective_config):
                     log_warning(
-                        f"DC islands detected ({n_dc_islands} islands) but '{self.algorithm}' "
-                        f"algorithm does not support DC-island-aware partitioning. "
-                        f"Consider using 'kmedoids', 'dbscan', or 'hierarchical' (with non-ward linkage) for DC-island awareness.",
+                        f"AC islands detected ({n_ac_islands} islands) but '{self.algorithm}' "
+                        f"algorithm does not support AC-island-aware partitioning. "
+                        f"Consider using 'kmedoids', 'dbscan', or 'hierarchical' (with non-ward linkage) for AC-island awareness.",
                         LogCategory.PARTITIONING,
                     )
-                    dc_islands = None  # Disable DC-island awareness for unsupported algorithms
+                    ac_islands = None  # Disable AC-island awareness for unsupported algorithms
                 else:
                     log_info(
-                        f"Starting DC-island-aware geographical partitioning: {self.algorithm}, "
+                        f"Starting AC-island-aware geographical partitioning: {self.algorithm}, "
                         f"n_clusters={n_clusters}, metric={self.distance_metric}, "
-                        f"dc_islands={n_dc_islands}",
+                        f"ac_islands={n_ac_islands}",
                         LogCategory.PARTITIONING,
                     )
             else:
@@ -240,18 +240,18 @@ class GeographicalPartitioning(PartitioningStrategy):
                 LogCategory.PARTITIONING,
             )
 
-            # Perform clustering (pass dc_islands for DC-island-aware clustering)
+            # Perform clustering (pass ac_islands for AC-island-aware clustering)
             labels = self._run_clustering(
-                coordinates, effective_config, dc_islands=dc_islands, **kwargs
+                coordinates, effective_config, ac_islands=ac_islands, **kwargs
             )
 
             # Create and validate partition
             partition_map = create_partition_map(nodes, labels)
             validate_partition(partition_map, len(nodes), self._get_strategy_name())
 
-            # Validate DC island consistency if DC-island awareness was applied
-            if dc_islands is not None:
-                self._validate_cluster_dc_island_consistency(graph, partition_map)
+            # Validate AC island consistency if AC-island awareness was applied
+            if ac_islands is not None:
+                self._validate_cluster_ac_island_consistency(graph, partition_map)
 
             log_info(
                 f"Geographical partitioning complete: {len(partition_map)} clusters",
@@ -272,11 +272,11 @@ class GeographicalPartitioning(PartitioningStrategy):
                 },
             ) from e
 
-    def _supports_dc_island_awareness(self, config: GeographicalConfig) -> bool:
+    def _supports_ac_island_awareness(self, config: GeographicalConfig) -> bool:
         """
-        Check if current algorithm configuration supports DC-island awareness.
+        Check if current algorithm configuration supports AC-island awareness.
 
-        DC-island awareness requires precomputed distance matrices. Algorithms
+        AC-island awareness requires precomputed distance matrices. Algorithms
         that work directly on raw coordinates (kmeans, hierarchical with ward)
         cannot support this feature.
 
@@ -288,12 +288,12 @@ class GeographicalPartitioning(PartitioningStrategy):
         Returns
         -------
         bool
-            True if DC-island awareness is supported, False otherwise.
+            True if AC-island awareness is supported, False otherwise.
         """
-        if self.algorithm in self.DC_ISLAND_AWARE_ALGORITHMS:
+        if self.algorithm in self.AC_ISLAND_AWARE_ALGORITHMS:
             return True
 
-        # Hierarchical supports DC-island awareness with non-ward linkage
+        # Hierarchical supports AC-island awareness with non-ward linkage
         if self.algorithm == "hierarchical" and config.hierarchical_linkage != "ward":
             return True
 
@@ -432,7 +432,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         config : GeographicalConfig
             Configuration parameters.
         **kwargs : dict
-            Must include 'n_clusters'. May include 'dc_islands'.
+            Must include 'n_clusters'. May include 'ac_islands'.
 
         Returns
         -------
@@ -451,16 +451,16 @@ class GeographicalPartitioning(PartitioningStrategy):
                 strategy=self._get_strategy_name(),
             )
 
-        dc_islands = kwargs.get("dc_islands")
+        ac_islands = kwargs.get("ac_islands")
 
-        if dc_islands is not None:
+        if ac_islands is not None:
             log_debug(
-                f"Running DC-island-aware K-medoids with {n_clusters} clusters, "
+                f"Running AC-island-aware K-medoids with {n_clusters} clusters, "
                 f"metric={self.distance_metric}",
                 LogCategory.PARTITIONING,
             )
-            distance_matrix = self._build_dc_island_aware_distance_matrix(
-                coordinates, dc_islands, config
+            distance_matrix = self._build_ac_island_aware_distance_matrix(
+                coordinates, ac_islands, config
             )
         else:
             log_debug(
@@ -484,7 +484,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         config : GeographicalConfig
             Configuration parameters.
         **kwargs : dict
-            Must include 'eps' and 'min_samples'. May include 'dc_islands'.
+            Must include 'eps' and 'min_samples'. May include 'ac_islands'.
 
         Returns
         -------
@@ -505,15 +505,15 @@ class GeographicalPartitioning(PartitioningStrategy):
                 strategy=self._get_strategy_name(),
             )
 
-        dc_islands = kwargs.get("dc_islands")
+        ac_islands = kwargs.get("ac_islands")
 
-        if dc_islands is not None:
+        if ac_islands is not None:
             log_debug(
-                f"Running DC-island-aware DBSCAN with eps={eps}, min_samples={min_samples}",
+                f"Running AC-island-aware DBSCAN with eps={eps}, min_samples={min_samples}",
                 LogCategory.PARTITIONING,
             )
-            distance_matrix = self._build_dc_island_aware_distance_matrix(
-                coordinates, dc_islands, config
+            distance_matrix = self._build_ac_island_aware_distance_matrix(
+                coordinates, ac_islands, config
             )
         else:
             log_debug(
@@ -537,7 +537,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         config : GeographicalConfig
             Configuration parameters.
         **kwargs : dict
-            Must include 'n_clusters'. May include 'dc_islands'.
+            Must include 'n_clusters'. May include 'ac_islands'.
 
         Returns
         -------
@@ -557,7 +557,7 @@ class GeographicalPartitioning(PartitioningStrategy):
             )
 
         linkage = config.hierarchical_linkage
-        dc_islands = kwargs.get("dc_islands")
+        ac_islands = kwargs.get("ac_islands")
 
         # Ward linkage only works with Euclidean distance on raw features
         if linkage == "ward":
@@ -581,14 +581,14 @@ class GeographicalPartitioning(PartitioningStrategy):
             return clustering.fit_predict(coordinates)
         else:
             # For other linkages, use precomputed distance matrix
-            if dc_islands is not None:
+            if ac_islands is not None:
                 log_debug(
-                    f"Running DC-island-aware hierarchical clustering with {n_clusters} clusters, "
+                    f"Running AC-island-aware hierarchical clustering with {n_clusters} clusters, "
                     f"linkage={linkage}",
                     LogCategory.PARTITIONING,
                 )
-                distance_matrix = self._build_dc_island_aware_distance_matrix(
-                    coordinates, dc_islands, config
+                distance_matrix = self._build_ac_island_aware_distance_matrix(
+                    coordinates, ac_islands, config
                 )
             else:
                 log_debug(
@@ -612,7 +612,7 @@ class GeographicalPartitioning(PartitioningStrategy):
         config : GeographicalConfig
             Configuration parameters.
         **kwargs : dict
-            May include 'min_cluster_size' and 'dc_islands'.
+            May include 'min_cluster_size' and 'ac_islands'.
 
         Returns
         -------
@@ -620,15 +620,15 @@ class GeographicalPartitioning(PartitioningStrategy):
             Array of cluster labels.
         """
         min_cluster_size = kwargs.get("min_cluster_size", 5)
-        dc_islands = kwargs.get("dc_islands")
+        ac_islands = kwargs.get("ac_islands")
 
-        if dc_islands is not None:
+        if ac_islands is not None:
             log_debug(
-                f"Running DC-island-aware HDBSCAN with min_cluster_size={min_cluster_size}",
+                f"Running AC-island-aware HDBSCAN with min_cluster_size={min_cluster_size}",
                 LogCategory.PARTITIONING,
             )
-            distance_matrix = self._build_dc_island_aware_distance_matrix(
-                coordinates, dc_islands, config
+            distance_matrix = self._build_ac_island_aware_distance_matrix(
+                coordinates, ac_islands, config
             )
             # Use HDBSCAN with precomputed distances
             import hdbscan
@@ -645,14 +645,14 @@ class GeographicalPartitioning(PartitioningStrategy):
             return run_hdbscan(coords_rad, min_cluster_size, self.distance_metric)
 
     # =========================================================================
-    # DC-ISLAND AWARENESS METHODS
+    # AC-ISLAND AWARENESS METHODS
     # =========================================================================
 
-    def _has_dc_island_data(self, graph: nx.Graph, nodes: list[Any]) -> bool:
+    def _has_ac_island_data(self, graph: nx.Graph, nodes: list[Any]) -> bool:
         """
-        Check if the graph has DC island data on nodes.
+        Check if the graph has AC island data on nodes.
 
-        DC island data is automatically detected by checking for the 'dc_island'
+        AC island data is automatically detected by checking for the 'ac_island'
         attribute on nodes, which is set by the VoltageAwareStrategy (va_loader)
         when loading power system data with DC links.
 
@@ -666,16 +666,16 @@ class GeographicalPartitioning(PartitioningStrategy):
         Returns
         -------
         bool
-            True if all nodes have the dc_island attribute, False otherwise.
+            True if all nodes have the ac_island attribute, False otherwise.
         """
         for node in nodes:
-            if self.dc_island_attr not in graph.nodes[node]:
+            if self.ac_island_attr not in graph.nodes[node]:
                 return False
         return True
 
-    def _extract_dc_islands(self, graph: nx.Graph, nodes: list[Any]) -> np.ndarray:
+    def _extract_ac_islands(self, graph: nx.Graph, nodes: list[Any]) -> np.ndarray:
         """
-        Extract DC island IDs from graph nodes.
+        Extract AC island IDs from graph nodes.
 
         Parameters
         ----------
@@ -687,51 +687,51 @@ class GeographicalPartitioning(PartitioningStrategy):
         Returns
         -------
         np.ndarray
-            Array of DC island IDs for each node.
+            Array of AC island IDs for each node.
 
         Raises
         ------
         PartitioningError
-            If any node is missing the dc_island attribute.
+            If any node is missing the ac_island attribute.
         """
-        dc_islands = []
+        ac_islands = []
         missing_nodes = []
 
         for node in nodes:
-            dc_island = graph.nodes[node].get("dc_island")
-            if dc_island is None:
+            ac_island = graph.nodes[node].get("ac_island")
+            if ac_island is None:
                 missing_nodes.append(node)
-            dc_islands.append(dc_island)
+            ac_islands.append(ac_island)
 
         if missing_nodes:
             sample = missing_nodes[:5]
             raise PartitioningError(
-                f"DC-island-aware partitioning requires 'dc_island' attribute "
+                f"AC-island-aware partitioning requires 'ac_island' attribute "
                 f"on all nodes. {len(missing_nodes)} node(s) are missing this attribute "
-                f"(first few: {sample}). Use 'va_loader' to automatically detect DC islands.",
+                f"(first few: {sample}). Use 'va_loader' to automatically detect AC islands.",
                 strategy=self._get_strategy_name(),
             )
 
-        return np.array(dc_islands)
+        return np.array(ac_islands)
 
-    def _build_dc_island_aware_distance_matrix(
+    def _build_ac_island_aware_distance_matrix(
         self,
         coordinates: np.ndarray,
-        dc_islands: np.ndarray,
+        ac_islands: np.ndarray,
         config: GeographicalConfig,
     ) -> np.ndarray:
         """
-        Build distance matrix with DC island awareness.
+        Build distance matrix with AC island awareness.
 
-        Nodes in the same DC island use geographical distance.
-        Nodes in different DC islands get infinite distance.
+        Nodes in the same AC island use geographical distance.
+        Nodes in different AC islands get infinite distance.
 
         Parameters
         ----------
         coordinates : np.ndarray
             Array of [lat, lon] coordinates (n x 2).
-        dc_islands : np.ndarray
-            Array of DC island IDs (n).
+        ac_islands : np.ndarray
+            Array of AC island IDs (n).
         config : GeographicalConfig
             Configuration instance.
 
@@ -740,15 +740,15 @@ class GeographicalPartitioning(PartitioningStrategy):
         np.ndarray
             Distance matrix (n x n) where:
 
-            - d[i,j] = geographical_distance if same DC island
-            - d[i,j] = infinite_distance if different DC islands
+            - d[i,j] = geographical_distance if same AC island
+            - d[i,j] = infinite_distance if different AC islands
             - d[i,i] = 0 (diagonal)
         """
         # Calculate geographical distances
         geo_distances = compute_geographical_distances(coordinates, self.distance_metric)
 
-        # same_island[i,j] = True if dc_islands[i] == dc_islands[j]
-        same_island_mask = dc_islands[:, np.newaxis] == dc_islands[np.newaxis, :]
+        # same_island[i,j] = True if ac_islands[i] == ac_islands[j]
+        same_island_mask = ac_islands[:, np.newaxis] == ac_islands[np.newaxis, :]
 
         # Build distance matrix: geo_distance if same island, infinite otherwise
         distance_matrix = np.where(same_island_mask, geo_distances, config.infinite_distance)
@@ -757,12 +757,12 @@ class GeographicalPartitioning(PartitioningStrategy):
         np.fill_diagonal(distance_matrix, 0.0)
 
         # Log statistics
-        n_dc_islands = len(np.unique(dc_islands))
+        n_ac_islands = len(np.unique(ac_islands))
         # Count compatible pairs (same island, excluding diagonal)
-        compatible_pairs = (np.sum(same_island_mask) - len(dc_islands)) // 2
+        compatible_pairs = (np.sum(same_island_mask) - len(ac_islands)) // 2
 
         log_debug(
-            f"Built DC-island-aware distance matrix: {n_dc_islands} DC island(s), "
+            f"Built AC-island-aware distance matrix: {n_ac_islands} AC island(s), "
             f"{compatible_pairs} compatible pairs",
             LogCategory.PARTITIONING,
         )
@@ -770,14 +770,14 @@ class GeographicalPartitioning(PartitioningStrategy):
         return distance_matrix
 
     @staticmethod
-    def _validate_cluster_dc_island_consistency(
+    def _validate_cluster_ac_island_consistency(
         graph: nx.Graph, partition_map: dict[int, list[Any]]
     ) -> None:
         """
-        Validate that clusters don't mix different DC islands.
+        Validate that clusters don't mix different AC islands.
 
-        With infinite distances between DC islands, clusters should never
-        contain nodes from multiple DC islands.
+        With infinite distances between AC islands, clusters should never
+        contain nodes from multiple AC islands.
 
         Parameters
         ----------
@@ -787,17 +787,17 @@ class GeographicalPartitioning(PartitioningStrategy):
             Resulting partition mapping.
         """
         for cluster_id, nodes in partition_map.items():
-            dc_islands_in_cluster = set()
+            ac_islands_in_cluster = set()
 
             for node in nodes:
-                dc_island = graph.nodes[node].get("dc_island")
-                if dc_island is not None:
-                    dc_islands_in_cluster.add(dc_island)
+                ac_island = graph.nodes[node].get("ac_island")
+                if ac_island is not None:
+                    ac_islands_in_cluster.add(ac_island)
 
-            if len(dc_islands_in_cluster) > 1:
+            if len(ac_islands_in_cluster) > 1:
                 log_warning(
-                    f"Cluster {cluster_id} contains nodes from multiple DC islands: "
-                    f"{dc_islands_in_cluster}. This should not happen with infinite distances.",
+                    f"Cluster {cluster_id} contains nodes from multiple AC islands: "
+                    f"{ac_islands_in_cluster}. This should not happen with infinite distances.",
                     LogCategory.PARTITIONING,
                     warn_user=False,
                 )

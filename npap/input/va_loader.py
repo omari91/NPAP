@@ -19,10 +19,10 @@ class VoltageAwareStrategy(DataLoadingStrategy):
     - Edges represent transmission lines, transformers, or DC links
     - Edge direction follows defined bus0 -> bus1 convention
 
-    DC Island Detection:
+    AC Island Detection:
         After loading lines and transformers (before DC links), the loader detects
-        disconnected components which represent separate DC islands. Each bus is
-        assigned a 'dc_island' attribute indicating which island it belongs to.
+        disconnected components which represent separate AC islands. Each bus is
+        assigned a 'ac_island' attribute indicating which island it belongs to.
         DC links then connect these islands.
 
     Edge Schema (unified for all types):
@@ -114,8 +114,8 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         The loading process:
 
         1. Load nodes, lines, and transformers
-        2. Detect DC islands (connected components before DC links)
-        3. Assign 'dc_island' attribute to each bus
+        2. Detect AC islands (connected components before DC links)
+        3. Assign 'ac_island' attribute to each bus
         4. Add DC links to connect islands
         5. Remove isolated nodes and warn user
         6. Return fully connected graph
@@ -142,7 +142,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         Returns
         -------
         nx.DiGraph or nx.MultiDiGraph
-            DiGraph or MultiDiGraph with combined edges and dc_island attributes.
+            DiGraph or MultiDiGraph with combined edges and ac_island attributes.
 
         Raises
         ------
@@ -182,7 +182,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
             self._validate_edge_references(lines_df, valid_node_ids, "lines")
             self._validate_edge_references(transformers_df, valid_node_ids, "transformers")
 
-            # Prepare node tuples (without dc_island yet)
+            # Prepare node tuples (without ac_island yet)
             node_tuples = self._prepare_node_tuples(nodes_df, node_id_col)
 
             # Prepare AC edge tuples (lines and transformers)
@@ -190,14 +190,14 @@ class VoltageAwareStrategy(DataLoadingStrategy):
             transformer_tuples = self._prepare_transformer_tuples(transformers_df)
             ac_edge_tuples = line_tuples + transformer_tuples
 
-            # Step 1: Detect DC islands before adding DC links
-            dc_island_map = self._detect_dc_islands(node_tuples, ac_edge_tuples)
+            # Step 1: Detect AC islands before adding DC links
+            ac_island_map = self._detect_ac_islands(node_tuples, ac_edge_tuples)
 
-            # Update node tuples with dc_island attribute
-            node_tuples = self._add_dc_island_to_nodes(node_tuples, dc_island_map)
+            # Update node tuples with ac_island attribute
+            node_tuples = self._add_ac_island_to_nodes(node_tuples, ac_island_map)
 
-            # Log DC island summary
-            self._log_dc_island_summary(dc_island_map)
+            # Log AC island summary
+            self._log_ac_island_summary(ac_island_map)
 
             # Prepare DC link tuples
             dc_link_tuples = self._prepare_dc_link_tuples(converters_df, links_df, valid_node_ids)
@@ -252,18 +252,18 @@ class VoltageAwareStrategy(DataLoadingStrategy):
             ) from e
 
     # =========================================================================
-    # DC Island Detection Methods
+    # AC Island Detection Methods
     # =========================================================================
 
     @staticmethod
-    def _detect_dc_islands(
+    def _detect_ac_islands(
         node_tuples: list[tuple[Any, dict]], ac_edge_tuples: list[tuple[Any, Any, dict]]
     ) -> dict[Any, int]:
         """
-        Detect DC islands by finding connected components before DC links are added.
+        Detect AC islands by finding connected components before DC links are added.
 
         Each connected component of lines and transformers represents a separate
-        DC island (AC network that will be connected via DC links).
+        AC island (AC network that will be connected via DC links).
 
         Parameters
         ----------
@@ -275,7 +275,7 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         Returns
         -------
         dict[Any, int]
-            Dictionary mapping node_id -> dc_island_id.
+            Dictionary mapping node_id -> ac_island_id.
         """
         # Create temporary undirected graph for component detection
         temp_graph = nx.Graph()
@@ -291,60 +291,60 @@ class VoltageAwareStrategy(DataLoadingStrategy):
         # Find connected components
         components = list(nx.connected_components(temp_graph))
 
-        # Create mapping: node_id -> dc_island_id
-        dc_island_map: dict[Any, int] = {}
+        # Create mapping: node_id -> ac_island_id
+        ac_island_map: dict[Any, int] = {}
         for island_id, component in enumerate(components):
             for node_id in component:
-                dc_island_map[node_id] = island_id
+                ac_island_map[node_id] = island_id
 
-        return dc_island_map
+        return ac_island_map
 
     @staticmethod
-    def _add_dc_island_to_nodes(
-        node_tuples: list[tuple[Any, dict]], dc_island_map: dict[Any, int]
+    def _add_ac_island_to_nodes(
+        node_tuples: list[tuple[Any, dict]], ac_island_map: dict[Any, int]
     ) -> list[tuple[Any, dict]]:
         """
-        Add dc_island attribute to node tuples.
+        Add ac_island attribute to node tuples.
 
         Parameters
         ----------
         node_tuples : list[tuple[Any, dict]]
             List of (node_id, attributes) tuples.
-        dc_island_map : dict[Any, int]
-            Mapping of node_id -> dc_island_id.
+        ac_island_map : dict[Any, int]
+            Mapping of node_id -> ac_island_id.
 
         Returns
         -------
         list[tuple[Any, dict]]
-            Updated node tuples with dc_island attribute.
+            Updated node tuples with ac_island attribute.
         """
         updated_tuples = []
         for node_id, attrs in node_tuples:
             attrs_copy = attrs.copy()
-            attrs_copy["dc_island"] = dc_island_map.get(node_id, -1)
+            attrs_copy["ac_island"] = ac_island_map.get(node_id, -1)
             updated_tuples.append((node_id, attrs_copy))
         return updated_tuples
 
     @staticmethod
-    def _log_dc_island_summary(dc_island_map: dict[Any, int]) -> None:
+    def _log_ac_island_summary(ac_island_map: dict[Any, int]) -> None:
         """
-        Log summary of detected DC islands.
+        Log summary of detected AC islands.
 
         Parameters
         ----------
-        dc_island_map : dict[Any, int]
-            Mapping of node_id -> dc_island_id.
+        ac_island_map : dict[Any, int]
+            Mapping of node_id -> ac_island_id.
         """
         island_counts: dict[int, int] = {}
-        for island_id in dc_island_map.values():
+        for island_id in ac_island_map.values():
             island_counts[island_id] = island_counts.get(island_id, 0) + 1
 
         n_islands = len(island_counts)
-        log_info(f"Detected {n_islands} DC island(s)", LogCategory.INPUT)
+        log_info(f"Detected {n_islands} AC island(s)", LogCategory.INPUT)
 
         if n_islands > 1:
             for island_id, count in sorted(island_counts.items()):
-                log_debug(f"  DC Island {island_id}: {count} nodes", LogCategory.INPUT)
+                log_debug(f"  AC Island {island_id}: {count} nodes", LogCategory.INPUT)
 
     # =========================================================================
     # Isolated Node Removal Methods
