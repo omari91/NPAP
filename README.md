@@ -12,7 +12,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Documentation](https://readthedocs.org/projects/npap/badge/?version=latest)](https://npap.readthedocs.io)
 [![codecov](https://codecov.io/gh/IEE-TUGraz/npap/branch/main/graph/badge.svg)](https://codecov.io/gh/IEE-TUGraz/npap)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/IEE-TUGraz/npap/main.svg)](https://results.pre-commit.ci/latest/github/IEE-TUGraz/npap/main)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/IEE-TUGraz/NPAP/main.svg)](https://results.pre-commit.ci/latest/github/IEE-TUGraz/NPAP/main)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ---
@@ -30,6 +30,12 @@ are supported by the [Research Center Energetic](https://www.tugraz.at/forschung
 NetZero-Opt, [101116212](https://cordis.europa.eu/project/id/101116212)). Views and opinions expressed are however those of the author(s) only and do not necessarily
 reflect those of the European Union or the European Research Council. Neither the European Union nor the granting
 authority can be held responsible for them.
+
+## Documentation
+
+For comprehensive guides, API reference, and tutorials, visit the official documentation:
+
+**[https://npap.readthedocs.io](https://npap.readthedocs.io)**
 
 ## Features
 
@@ -60,7 +66,8 @@ manager.load_data(
     node_file="buses.csv",
     line_file="lines.csv",
     transformer_file="transformers.csv",
-    link_file="links.csv"
+    converter_file="converters.csv",
+    link_file="dc_links.csv"
 )
 
 # 3. Aggregate parallel edges (optional)
@@ -95,7 +102,7 @@ manager.plot_network(style='simple', title='Aggregated Network')
 We warmly welcome contributions from everyone! Whether it's fixing a typo, improving documentation, reporting bugs, or implementing new features —
 every contribution matters.
 
-Please read our [Contributing Guide](CONTRIBUTING.md) to get started. Don't hesitate to open an issue if you have questions or ideas!
+Please read our [Contributing Guide](CONTRIBUTING.md) to get started, or visit the full [Contributing Documentation](https://npap.readthedocs.io/en/latest/contributing.html) for detailed guidelines. Don't hesitate to open an issue if you have questions or ideas!
 
 ## License
 

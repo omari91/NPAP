@@ -2,6 +2,10 @@
 
 First off, **thank you** for considering contributing to NPAP! It's people like you who make open-source such a wonderful place to learn, create, and collaborate.
 
+> [!TIP]
+> For the full contributing documentation — including how to extend NPAP with custom strategies, detailed code style guidelines, and citing instructions — visit
+> **[npap.readthedocs.io/en/latest/contributing.html](https://npap.readthedocs.io/en/latest/contributing.html)**
+
 ---
 
 ## Table of Contents
@@ -156,4 +160,6 @@ Be **kind and respectful**. We're all here to learn and build something useful t
 <b>Questions?</b> Don't hesitate to open an issue. There are no silly questions!
 <br><br>
 <i>Thank you for contributing — every contribution helps make NPAP better for everyone.</i>
+<br><br>
+📖 <a href="https://npap.readthedocs.io/en/latest/contributing.html">Full contributing docs on ReadTheDocs</a>
 </p>
