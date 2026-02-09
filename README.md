@@ -7,8 +7,8 @@
 </p>
 
 <!-- Badges -->
-[![PyPI version](https://img.shields.io/pypi/v/npap.svg)](https://pypi.org/project/npap/)
-[![Python versions](https://img.shields.io/pypi/pyversions/npap.svg)](https://pypi.org/project/npap/)
+[![PyPI version](https://img.shields.io/pypi/v/npap.svg?cacheSeconds=0)](https://pypi.org/project/npap/)
+[![Python versions](https://img.shields.io/pypi/pyversions/npap.svg?cacheSeconds=0)](https://pypi.org/project/npap/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Documentation](https://readthedocs.org/projects/npap/badge/?version=latest)](https://npap.readthedocs.io)
 [![codecov](https://codecov.io/gh/IEE-TUGraz/npap/branch/main/graph/badge.svg)](https://codecov.io/gh/IEE-TUGraz/npap)
@@ -27,9 +27,7 @@ manageable pieces.
 > [!NOTE]
 > Project contributors from [IEE](https://www.tugraz.at/institute/iee/home) (Institute of Electricity Economics and Energy Innovation) at the [Technical University of Graz](https://www.tugraz.at/)
 are supported by the [Research Center Energetic](https://www.tugraz.at/forschung/forschung-an-der-tu-graz/research-centers/research-center-for-energy-economics-and-energy-analytics-energetic) and funded by the European Union (ERC,
-NetZero-Opt, [101116212](https://cordis.europa.eu/project/id/101116212)). Views and opinions expressed are however those of the author(s) only and do not necessarily
-reflect those of the European Union or the European Research Council. Neither the European Union nor the granting
-authority can be held responsible for them.
+NetZero-Opt, [101116212](https://cordis.europa.eu/project/id/101116212)).
 
 ## Documentation
 
