@@ -4,7 +4,7 @@ Combines electrical distance (PTDF) with voltage level constraints.
 
 ## Required Attributes
 
-- **Nodes**: `voltage`, `dc_island`
+- **Nodes**: `voltage`, `ac_island`
 - **Edges**: `x` (reactance)
 
 ## Available Strategies

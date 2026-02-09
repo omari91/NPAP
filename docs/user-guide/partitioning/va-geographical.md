@@ -1,10 +1,10 @@
 # Voltage-Aware Geographical Partitioning
 
-Combines geographic distance with voltage level and DC island constraints.
+Combines geographic distance with voltage level and AC island constraints.
 
 ## Required Attributes
 
-- **Nodes**: `lat`, `lon`, `voltage`, `dc_island`
+- **Nodes**: `lat`, `lon`, `voltage`, `ac_island`
 
 ## Available Strategies
 
@@ -19,7 +19,7 @@ Combines geographic distance with voltage level and DC island constraints.
 
 ## Standard Mode
 
-Nodes in different voltage levels or DC islands receive infinite distance:
+Nodes in different voltage levels or AC islands receive infinite distance:
 
 ```python
 partition = manager.partition(

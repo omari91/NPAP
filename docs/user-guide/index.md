@@ -145,8 +145,8 @@ Different strategies require specific node and edge attributes:
 | Strategy Type | Node Attributes | Edge Attributes |
 |---------------|-----------------|-----------------|
 | Geographical | `lat`, `lon` | — |
-| Electrical | `dc_island` | `x` (reactance) |
-| Voltage-Aware | `lat`, `lon`, `voltage`, `dc_island` | `x`, `type` |
+| Electrical | `ac_island` | `x` (reactance) |
+| Voltage-Aware | `lat`, `lon`, `voltage`, `ac_island` | `x`, `type` |
 
 ## Error Handling
 

@@ -74,7 +74,7 @@ if isinstance(graph, nx.MultiDiGraph):
 # Step 4: Partition the Network
 # =============================================================================
 
-# VA-geographical partitioning respects voltage levels and DC islands
+# VA-geographical partitioning respects voltage levels and AC islands
 partition_result = manager.partition(
     strategy="va_geographical_kmedoids_haversine",
     n_clusters=50
@@ -231,7 +231,7 @@ aggregated = manager.aggregate(profile=profile)
 1. **Manager Pattern**: All operations go through {py:class}`~npap.PartitionAggregatorManager`
 2. **Strategy Selection**: Choose strategies based on your data and requirements
 3. **Voltage Awareness**: Use `va_loader` and `va_geographical_*` or `va_electrical_*` strategies for multi-voltage networks
-4. **DC Island Handling**: NPAP automatically detects and respects DC island boundaries (if `dc_island` attribute is present)
+4. **AC Island Handling**: NPAP automatically detects and respects AC island boundaries (if `ac_island` attribute is present)
 5. **Parallel Edges**: Aggregate them before partitioning
 
 ## Next Steps

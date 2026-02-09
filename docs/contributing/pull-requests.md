@@ -92,7 +92,7 @@ update code
 
 | Type | Prefix | Example                                          |
 |------|--------|--------------------------------------------------|
-| Feature | `Add` | `Add DC-island detection`                        |
+| Feature | `Add` | `Add AC-island detection`                        |
 | Bug fix | `Fix` | `Fix kmeans convergence issue`                   |
 | Documentation | `Docs` | `docs: update quick start guide`                 |
 | Refactoring | `Refactor` | `Refactor manager structure`                     |

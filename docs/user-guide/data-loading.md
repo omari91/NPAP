@@ -195,18 +195,18 @@ from,to,p_max,converter_from,converter_to
 conv_1,conv_2,800,conv_1,conv_2
 ```
 
-### DC Island Detection
+### AC Island Detection
 
-The voltage-aware loader automatically detects **DC islands** - groups of AC-connected buses separated by DC links:
+The voltage-aware loader automatically detects **AC islands** - groups of AC-connected buses separated by DC links:
 
 ```{mermaid}
 flowchart LR
-    subgraph Island1[DC Island 0]
+    subgraph Island1[AC Island 0]
         A[Bus A] --- B[Bus B]
         B --- C[Bus C]
     end
 
-    subgraph Island2[DC Island 1]
+    subgraph Island2[AC Island 1]
         D[Bus D] --- E[Bus E]
         E --- F[Bus F]
     end
@@ -221,14 +221,14 @@ flowchart LR
     style F fill:#0fad6b,stroke:#076b3f,color:#fff
 ```
 
-Each node receives a `dc_island` attribute:
+Each node receives a `ac_island` attribute:
 
 ```python
 graph = manager.load_data("va_loader", ...)
 
-# Check DC island assignments
+# Check AC island assignments
 for node, data in graph.nodes(data=True):
-    print(f"{node}: DC Island {data['dc_island']}")
+    print(f"{node}: AC Island {data['ac_island']}")
 ```
 
 ### Edge Type Classification

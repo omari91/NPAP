@@ -4,7 +4,7 @@ Clusters nodes based on **electrical distance** computed from Power Transfer Dis
 
 ## Required Attributes
 
-- **Nodes**: `dc_island` (DC island identifier)
+- **Nodes**: `ac_island` (AC island identifier)
 - **Edges**: `x` (reactance)
 
 ## Mathematical Background
@@ -34,21 +34,21 @@ partition = manager.partition(
 )
 ```
 
-## DC-Island Handling
+## AC-Island Handling
 
-Electrical partitioning is always DC-island aware:
+Electrical partitioning is always AC-island aware:
 
-- PTDF is computed independently for each DC island
+- PTDF is computed independently for each AC island
 - Nodes in different islands have infinite distance
 - Each island is clustered separately
 
 ```{mermaid}
 flowchart TB
-    subgraph Island0[DC Island 0]
+    subgraph Island0[AC Island 0]
         A[Cluster 0] --- B[Cluster 1]
     end
 
-    subgraph Island1[DC Island 1]
+    subgraph Island1[AC Island 1]
         C[Cluster 2] --- D[Cluster 3]
     end
 

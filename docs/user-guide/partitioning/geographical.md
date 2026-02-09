@@ -8,7 +8,7 @@ Clusters nodes based on geographic coordinates using various clustering algorith
 
 ## Available Strategies
 
-| Strategy | Algorithm | Metric | DC-Island Aware |
+| Strategy | Algorithm | Metric | AC-Island Aware |
 |----------|-----------|--------|-----------------|
 | `geographical_kmeans` | K-Means | Euclidean | No |
 | `geographical_kmedoids_euclidean` | K-Medoids | Euclidean | Yes |
@@ -19,11 +19,11 @@ Clusters nodes based on geographic coordinates using various clustering algorith
 | `geographical_hdbscan_euclidean` | HDBSCAN | Euclidean | Yes |
 | `geographical_hdbscan_haversine` | HDBSCAN | Haversine | Yes |
 
-*Ward linkage does not support DC-island awareness
+*Ward linkage does not support AC-island awareness
 
 ## K-Means Clustering
 
-Fast clustering on raw coordinates. Best for quick partitioning when DC-island boundaries don't matter.
+Fast clustering on raw coordinates. Best for quick partitioning when AC-island boundaries don't matter.
 
 ```python
 partition = manager.partition(
@@ -42,12 +42,12 @@ partition = manager.partition(
 - `n_init`: Number of initializations
 
 ```{warning}
-K-Means does **not** support DC-island awareness. If your network has DC links, consider using K-Medoids instead.
+K-Means does **not** support AC-island awareness. If your network has DC links, consider using K-Medoids instead.
 ```
 
 ## K-Medoids Clustering
 
-More robust clustering using precomputed distance matrices. Supports DC-island constraints.
+More robust clustering using precomputed distance matrices. Supports AC-island constraints.
 
 ```python
 # Euclidean distance (for projected coordinates)
@@ -107,7 +107,7 @@ partition = manager.partition(
   - `single`: Minimum distance between clusters
 
 ```{warning}
-Ward linkage (`ward`) is **not supported** when DC-island awareness is needed, as it requires Euclidean distances and cannot use precomputed distance matrices.
+Ward linkage (`ward`) is **not supported** when AC-island awareness is needed, as it requires Euclidean distances and cannot use precomputed distance matrices.
 ```
 
 ## HDBSCAN Clustering

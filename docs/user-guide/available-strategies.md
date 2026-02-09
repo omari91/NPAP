@@ -108,7 +108,7 @@ NPAP provides four families of partitioning strategies:
 
 Clusters nodes based on geographic coordinates.
 
-| Strategy | Algorithm | Metric | DC-Island Aware |
+| Strategy | Algorithm | Metric | AC-Island Aware |
 |----------|-----------|--------|-----------------|
 | `geographical_kmeans` | K-Means | Euclidean | No |
 | `geographical_kmedoids_euclidean` | K-Medoids | Euclidean | Yes |
@@ -119,24 +119,24 @@ Clusters nodes based on geographic coordinates.
 | `geographical_hdbscan_euclidean` | HDBSCAN | Euclidean | Yes |
 | `geographical_hdbscan_haversine` | HDBSCAN | Haversine | Yes |
 
-*Ward linkage does not support DC-island awareness
+*Ward linkage does not support AC-island awareness
 
 **Required node attributes**: `lat`, `lon`
 
 ### Electrical Partitioning
 
-Clusters nodes based on electrical distance (PTDF approach) respecting DC islands.
+Clusters nodes based on electrical distance (PTDF approach) respecting AC islands.
 
 | Strategy | Algorithm | Description                                           |
 |----------|-----------|-------------------------------------------------------|
 | `electrical_kmeans` | K-Means | Provides arbitrary centroid node                      |
 | `electrical_kmedoids` | K-Medoids | Provides existing centroid node (e.g. Kron-Reduction) |
 
-**Required attributes**: Nodes: `dc_island` | Edges: `x` (reactance)
+**Required attributes**: Nodes: `ac_island` | Edges: `x` (reactance)
 
 ### Voltage-Aware Geographical Partitioning
 
-Combines geographical distance with voltage level and DC island constraints.
+Combines geographical distance with voltage level and AC island constraints.
 
 Voltage-aware geographical partitioning provides two modes for defining the number of clusters per voltage level:
 1. **Standard**: Only the total number of clusters over all voltage levels is specified by the user. The number of clusters per voltage level is set by the clustering algorithm.
@@ -151,18 +151,18 @@ Voltage-aware geographical partitioning provides two modes for defining the numb
 | `va_geographical_proportional_kmedoids_haversine` | Proportional | Proportional by number of nodes                 |
 | `va_geographical_proportional_hierarchical` | Proportional | Proportional by number of nodes             |
 
-**Required node attributes**: `lat`, `lon`, `voltage`, `dc_island`
+**Required node attributes**: `lat`, `lon`, `voltage`, `ac_island`
 
 ### Voltage-Aware Electrical Partitioning
 
-Combines electrical distance (PTDF approach) with voltage level and DC island constraints.
+Combines electrical distance (PTDF approach) with voltage level and AC island constraints.
 
 | Strategy | Algorithm |
 |----------|-----------|
 | `va_electrical_kmedoids` | K-Medoids |
 | `va_electrical_hierarchical` | Agglomerative |
 
-**Required attributes**: Nodes: `voltage`, `dc_island` | Edges: `x` (reactance)
+**Required attributes**: Nodes: `voltage`, `ac_island` | Edges: `x` (reactance)
 
 ### Choosing a Partitioning Strategy
 
@@ -174,7 +174,7 @@ flowchart TD
     C -->|Yes| E[va_electrical_*]
     C -->|No| F[va_geographical_*]
     D -->|Yes| G[electrical_*]
-    D -->|No| H{DC islands?}
+    D -->|No| H{AC islands?}
     H -->|Yes| I[geographical_kmedoids_*]
     H -->|No| L[geographical_*]
 

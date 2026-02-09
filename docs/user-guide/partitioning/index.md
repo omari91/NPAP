@@ -51,27 +51,27 @@ va-geographical
 va-electrical
 ```
 
-## DC-Island Awareness
+## AC-Island Awareness
 
-### What Are DC Islands?
+### What Are AC Islands?
 
-In networks with HVDC links, AC-connected regions form **DC islands**. These islands:
+In networks with HVDC links, AC-connected regions form **AC islands**. These islands:
 
 - Are electrically separate in AC sense
 - Connected only through DC links
 - Have independent power flow characteristics
 
-### How NPAP Handles DC Islands
+### How NPAP Handles AC Islands
 
-When nodes have a `dc_island` attribute (automatically set by `va_loader`):
+When nodes have a `ac_island` attribute (automatically set by `va_loader`):
 
 1. **Distance matrices** include infinite distances between islands
 2. **Clustering algorithms** using precomputed distances respect these boundaries
-3. **Partitions** never span across DC island boundaries
+3. **Partitions** never span across AC island boundaries
 
 ### Algorithm Support
 
-| Algorithm | DC-Island Support |
+| Algorithm | AC-Island Support |
 |-----------|-------------------|
 | K-Means | No (works on raw coordinates) |
 | K-Medoids | Yes |
@@ -81,7 +81,7 @@ When nodes have a `dc_island` attribute (automatically set by `va_loader`):
 | Hierarchical (ward) | No |
 
 ```{note}
-K-Means and Ward linkage will issue a warning if DC islands are detected but will proceed without respecting island boundaries.
+K-Means and Ward linkage will issue a warning if AC islands are detected but will proceed without respecting island boundaries.
 ```
 
 ## Choosing a Strategy
@@ -96,7 +96,7 @@ flowchart TD
     C -->|Yes| E[va_electrical_*]
     C -->|No| F[va_geographical_*]
     D -->|Yes| G[electrical_*]
-    D -->|No| H{DC islands?}
+    D -->|No| H{AC islands?}
     H -->|Yes| I[geographical_kmedoids_*]
     H -->|No| K[geographical_kmeans]
 
@@ -117,7 +117,7 @@ flowchart TD
 | Use Case                     | Recommended Strategy |
 |------------------------------|---------------------|
 | Geographical clustering      | `geographical_kmeans` |
-| Geographical with DC islands | `geographical_kmedoids_haversine` |
+| Geographical with AC islands | `geographical_kmedoids_haversine` |
 | Electrical behavior grouping | `electrical_kmedoids` |
 | Multi-voltage network        | `va_geographical_kmedoids_haversine` |
 | Unknown cluster count        | `geographical_dbscan_*` or `geographical_hdbscan_*` |
@@ -144,7 +144,7 @@ config = GeographicalConfig(
     max_iter=300,                 # K-Means iterations
     n_init=10,                    # K-Means initializations
     hierarchical_linkage="ward",  # Hierarchical linkage
-    infinite_distance=1e4         # DC island separation
+    infinite_distance=1e4         # AC island separation
 )
 ```
 
