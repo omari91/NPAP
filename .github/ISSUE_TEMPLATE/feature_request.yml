@@ -1,0 +1,47 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for NPAP
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature! Please consider whether it fits NPAP's scope (network partitioning & aggregation).
+
+        Before submitting, please check [existing issues](https://github.com/IEE-TUGraz/NPAP/issues) and the [roadmap](https://github.com/IEE-TUGraz/NPAP#roadmap) to see if it's already planned.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of the feature you'd like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Use Case
+      description: What problem does this solve? What is your use case?
+      placeholder: I'm always frustrated when ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you envision this working? Include code examples if possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Other approaches you've thought about.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context, examples, references, or screenshots.
