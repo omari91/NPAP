@@ -265,10 +265,19 @@ class VAElectricalDistancePartitioning(PartitioningStrategy):
             # Build voltage key array for post-processing
             voltage_keys = self._build_voltage_key_array(graph, nodes, effective_config)
 
+            n_unique_voltages = len(np.unique(voltage_keys))
+            if n_unique_voltages <= 1:
+                raise ValidationError(
+                    "Voltage-aware electrical partitioning requires multiple voltage "
+                    "levels, but only one was found. Use standard "
+                    "ElectricalDistancePartitioning for single-voltage networks.",
+                    strategy=self._get_strategy_name(),
+                )
+
             log_info(
                 f"Starting VA electrical partitioning (PTDF): {self.algorithm}, "
                 f"n_clusters={n_clusters}, ac_islands={len(ac_islands)}, "
-                f"voltage_levels={len(np.unique(voltage_keys))}",
+                f"voltage_levels={n_unique_voltages}",
                 LogCategory.PARTITIONING,
             )
 

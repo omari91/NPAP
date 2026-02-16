@@ -20,6 +20,9 @@ from npap.partitioning.geographical import (
     GeographicalConfig,
     GeographicalPartitioning,
 )
+from npap.partitioning.va_electrical import (
+    VAElectricalDistancePartitioning,
+)
 from npap.partitioning.va_geographical import (
     VAGeographicalConfig,
     VAGeographicalPartitioning,
@@ -1029,3 +1032,61 @@ class TestPartitioningEdgeCases:
         # Just verify both are valid
         assert all_nodes_assigned(partition1, list(geographical_cluster_graph.nodes()))
         assert all_nodes_assigned(partition2, list(geographical_cluster_graph.nodes()))
+
+
+# =============================================================================
+# VOLTAGE-AWARE SINGLE VOLTAGE LEVEL REJECTION TESTS
+# =============================================================================
+
+
+class TestVAStrategiesSingleVoltageLevelError:
+    """Tests that VA strategies reject graphs with a single voltage level."""
+
+    def test_va_geographical_rejects_single_voltage(self):
+        """Test VA geographical raises ValidationError for single voltage level."""
+        G = nx.DiGraph()
+        G.add_node(0, lat=0.0, lon=0.0, voltage=220.0, ac_island=0)
+        G.add_node(1, lat=0.5, lon=0.5, voltage=220.0, ac_island=0)
+        G.add_node(2, lat=1.0, lon=1.0, voltage=220.0, ac_island=0)
+        G.add_edge(0, 1, x=0.1)
+        G.add_edge(1, 2, x=0.15)
+
+        strategy = VAGeographicalPartitioning(algorithm="kmedoids")
+
+        with pytest.raises(ValidationError, match="requires multiple voltage levels"):
+            strategy.partition(G, n_clusters=2)
+
+    def test_va_electrical_rejects_single_voltage(self):
+        """Test VA electrical raises ValidationError for single voltage level."""
+        G = nx.DiGraph()
+        G.add_node(0, lat=0.0, lon=0.0, voltage=220.0, ac_island=0)
+        G.add_node(1, lat=0.5, lon=0.5, voltage=220.0, ac_island=0)
+        G.add_node(2, lat=1.0, lon=1.0, voltage=220.0, ac_island=0)
+        G.add_edge(0, 1, x=0.1, type="line")
+        G.add_edge(1, 2, x=0.15, type="line")
+
+        strategy = VAElectricalDistancePartitioning(algorithm="kmedoids")
+
+        with pytest.raises(ValidationError, match="requires multiple voltage levels"):
+            strategy.partition(G, n_clusters=2)
+
+    def test_va_geographical_accepts_multiple_voltages(self, mixed_voltage_graph):
+        """Test VA geographical succeeds with multiple voltage levels."""
+        strategy = VAGeographicalPartitioning(algorithm="kmedoids")
+        partition = strategy.partition(mixed_voltage_graph, n_clusters=2, random_state=42)
+        assert all_nodes_assigned(partition, list(mixed_voltage_graph.nodes()))
+
+    def test_va_electrical_accepts_multiple_voltages(self):
+        """Test VA electrical succeeds with multiple voltage levels."""
+        G = nx.DiGraph()
+        G.add_node(0, lat=0.0, lon=0.0, voltage=220.0, ac_island=0)
+        G.add_node(1, lat=0.5, lon=0.5, voltage=220.0, ac_island=0)
+        G.add_node(2, lat=1.0, lon=1.0, voltage=380.0, ac_island=0)
+        G.add_node(3, lat=1.5, lon=1.5, voltage=380.0, ac_island=0)
+        G.add_edge(0, 1, x=0.1, type="line")
+        G.add_edge(2, 3, x=0.08, type="line")
+        G.add_edge(1, 2, x=0.05, type="trafo")
+
+        strategy = VAElectricalDistancePartitioning(algorithm="kmedoids")
+        partition = strategy.partition(G, n_clusters=2, random_state=42)
+        assert all_nodes_assigned(partition, list(G.nodes()))

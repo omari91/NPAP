@@ -4,7 +4,7 @@ from typing import Any
 import networkx as nx
 import numpy as np
 
-from npap.exceptions import PartitioningError
+from npap.exceptions import PartitioningError, ValidationError
 from npap.interfaces import PartitioningStrategy
 from npap.logging import LogCategory, log_debug, log_info, log_warning
 from npap.utils import (
@@ -254,6 +254,22 @@ class VAGeographicalPartitioning(PartitioningStrategy):
             # Get unique groups summary for validation
             n_groups = self._count_unique_groups(ac_islands, voltages, effective_config)
 
+            # Count unique voltage levels using tolerance-based rounding
+            voltage_keys = set()
+            for v in voltages:
+                if v is not None and isinstance(v, (int, float)):
+                    tol = max(effective_config.voltage_tolerance, 0.1)
+                    voltage_keys.add(round(float(v) / tol) * tol)
+                else:
+                    voltage_keys.add(v)
+            if len(voltage_keys) <= 1:
+                raise ValidationError(
+                    "Voltage-aware geographical partitioning requires multiple voltage "
+                    "levels, but only one was found. Use standard GeographicalPartitioning "
+                    "for single-voltage networks.",
+                    strategy=self._get_strategy_name(),
+                )
+
             # Log summary
             self._log_group_summary(ac_islands, voltages, n_groups)
 
@@ -296,7 +312,7 @@ class VAGeographicalPartitioning(PartitioningStrategy):
             return partition_map
 
         except Exception as e:
-            if isinstance(e, PartitioningError):
+            if isinstance(e, (PartitioningError, ValidationError)):
                 raise
             raise PartitioningError(
                 f"Voltage-aware geographical partitioning failed: {e}",
