@@ -36,7 +36,9 @@ class SpectralPartitioning(PartitioningStrategy):
     def _strategy_name(self) -> str:
         return "spectral_clustering"
 
-    def partition(self, graph: nx.DiGraph, /, *, n_clusters: int | None = None, **kwargs) -> dict[int, list[Any]]:
+    def partition(
+        self, graph: nx.DiGraph, /, *, n_clusters: int | None = None, **kwargs
+    ) -> dict[int, list[Any]]:
         if not n_clusters or n_clusters < 2:
             raise PartitioningError(
                 "SpectralPartitioning requires n_clusters >= 2.",
@@ -95,4 +97,4 @@ class CommunityPartitioning(PartitioningStrategy):
         return partition_map
 
 
-__all__ = ["SpectralPartitioning", "CommunityPartitioning"]
+__all__ = ["CommunityPartitioning", "SpectralPartitioning"]
