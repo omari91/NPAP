@@ -79,6 +79,7 @@ class PartitioningManager:
         """Register built-in partitioning strategies."""
         from npap.partitioning.electrical import ElectricalDistancePartitioning
         from npap.partitioning.geographical import GeographicalPartitioning
+        from npap.partitioning.graph_theory import CommunityPartitioning, SpectralPartitioning
         from npap.partitioning.va_geographical import (
             VAGeographicalConfig,
             VAGeographicalPartitioning,
@@ -155,6 +156,10 @@ class PartitioningManager:
         self._strategies["va_electrical_hierarchical"] = VAElectricalDistancePartitioning(
             algorithm="hierarchical"
         )
+
+        # Graph-theory based strategies
+        self._strategies["spectral_clustering"] = SpectralPartitioning(random_state=42)
+        self._strategies["community_modularity"] = CommunityPartitioning()
 
         log_debug("Registered default partitioning strategies", LogCategory.MANAGER)
 
@@ -790,7 +795,10 @@ class AggregationManager:
             SumEdgeStrategy,
             SumNodeStrategy,
         )
-        from npap.aggregation.physical_strategies import KronReductionStrategy
+        from npap.aggregation.physical_strategies import (
+            KronReductionStrategy,
+            TransformerConservationStrategy,
+        )
 
         # Topology strategies
         self._topology_strategies["simple"] = SimpleTopologyStrategy()
@@ -798,6 +806,7 @@ class AggregationManager:
 
         # Physical strategies
         self._physical_strategies["kron_reduction"] = KronReductionStrategy()
+        self._physical_strategies["transformer_conservation"] = TransformerConservationStrategy()
 
         # Node property strategies
         self._node_strategies["sum"] = SumNodeStrategy()

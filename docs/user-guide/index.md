@@ -7,8 +7,9 @@
 
 installation
 quick-start
+workflows
 available-strategies
-```
+``` 
 
 ```{toctree}
 :hidden:
